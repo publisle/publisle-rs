@@ -1,0 +1,17 @@
+**
+!native/
+!native/pdf/
+!native/pdf/Cargo.toml
+!native/pdf/Cargo.lock
+!native/pdf/src/
+!native/pdf/src/**
+!packages/
+!packages/pdf-service/
+!packages/pdf-service/dist/
+!packages/pdf-service/dist/worker.mjs
+!deploy/
+!deploy/vps/
+!deploy/vps/native-fonts.json
+!deploy/vps/runtime/
+!deploy/vps/runtime/package.json
+!deploy/vps/runtime/package-lock.json
