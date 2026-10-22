@@ -39,10 +39,12 @@ Local figures must remain inside `sourceDirectory`; HTTP sources are rejected
 by this API. Hosted images are fetched and validated separately by the service.
 
 Seven profiles have publisher-class measurements for page geometry, margins,
-font sizes and column counts. They remain candidate ports: matching geometry
-alone does not establish publisher approval or complete typographic fidelity.
+font sizes and column counts. Release checks require standards compliance,
+complete feature support and readable output without clipping, overlap or lost
+content. Exact legacy fonts, line breaks, pagination and raster similarity are
+not required. Measurements alone do not establish publisher approval.
 Native CLI use is explicit. Hosted profiles are advertised only after immutable
-image, resource-budget, content, visual-layout, PDF/UA-2 and speed verification.
+image, resource-budget, content, rendering quality, PDF/UA and speed verification.
 
 Math is a bounded parser for the supported Publisle math contract, not a TeX
 interpreter. Unknown commands, malformed groups, oversized expressions and

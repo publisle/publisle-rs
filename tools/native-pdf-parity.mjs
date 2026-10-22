@@ -1,4 +1,4 @@
-/** Compare frozen legacy PDFs and native candidates. Run on CI/VPS, not the desktop. */
+/** Optional legacy layout diagnostic; never a CI or publication requirement. */
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -188,7 +188,7 @@ export async function comparePdf(reference, candidate, output) {
   await mkdir(output, { recursive: true });
   const settings = JSON.parse(
     await readFile(
-      new URL("../native/pdf/READINESS.json", import.meta.url),
+      new URL("../native/pdf/reference.json", import.meta.url),
       "utf8",
     ),
   ).comparison;

@@ -13,5 +13,13 @@
     "sites/www/public/gibbs-overshoot-dark.svg": "d17112a3fcf402f26bc819b3fbdbbdc3014c761e4493b615f961ce39471abb64",
     "deploy/vps/worker.Dockerfile": "27fe98b47e399a3b5bb27eb4b223b156e2d1a8d6134a14d79f3329f555386d61",
     "packages/research/compiler/release.json": "5d951350da3a065287335a13a54f6bf47b4ffbb7e1045dbdbb107acb7bb357f7"
+  },
+  "comparison": {
+    "maximumGeometryErrorPt": 0.25,
+    "rasterDpi": 150,
+    "minimumPageSsim": 0.995,
+    "minimumFigureSsim": 0.995,
+    "matchingLineBreaks": true,
+    "matchingPageBreaks": true
   }
 }
