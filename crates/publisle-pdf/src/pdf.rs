@@ -256,12 +256,18 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
         let mut annotations = vec![];
         for draw in &page.draws {
             if let Some(tag) = draw.tag {
-                content
-                    .begin_marked_content_with_properties(Name(
+                {
+                    let mut marked = content.begin_marked_content_with_properties(Name(
                         structure_role(&layout.tags[tag].role, ua1).as_bytes(),
-                    ))
-                    .properties()
-                    .identify(mcid);
+                    ));
+                    let mut properties = marked.properties();
+                    properties.identify(mcid);
+                    // Readers generally copy from content streams, not the
+                    // structure tree. Put logical cluster text in both places.
+                    if let Some(actual) = &layout.tags[tag].actual_text {
+                        properties.actual_text(TextStr(actual));
+                    }
+                }
                 contents[tag].push((rank, page_ids[page_index], mcid));
                 ranks[tag] = ranks[tag].min(rank);
                 parents.push(tag_ids[tag]);

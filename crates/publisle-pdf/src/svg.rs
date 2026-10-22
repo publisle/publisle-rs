@@ -5,6 +5,7 @@ use crate::{
 };
 use resvg::usvg::{self, fontdb};
 use std::{
+    collections::BTreeSet,
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -95,7 +96,7 @@ pub(crate) fn tree(path: &Path, fonts: &Fonts) -> Result<usvg::Tree> {
             "SVG contains unsupported active or external content.",
         ));
     }
-    let failures = Arc::new(Mutex::new(Vec::<String>::new()));
+    let failures = Arc::new(Mutex::new(BTreeSet::<String>::new()));
     let mut options = usvg::Options::default();
     // Both resolver entry points must be disabled: the default data: resolver can
     // recursively process embedded SVGs, and the string resolver may read files.
@@ -121,7 +122,7 @@ pub(crate) fn tree(path: &Path, fonts: &Fonts) -> Result<usvg::Tree> {
     options.font_resolver.select_fallback = Box::new(move |character, used, db| {
         let selected = fallback(character, used, db);
         if selected.is_none() && !character.is_control() {
-            missing.lock().unwrap().push(format!(
+            missing.lock().unwrap().insert(format!(
                 "No pinned font can shape U+{:04X} ({character:?}).",
                 u32::from(character)
             ));
@@ -133,7 +134,16 @@ pub(crate) fn tree(path: &Path, fonts: &Fonts) -> Result<usvg::Tree> {
     if !failures.is_empty() {
         return Err(Diagnostic::new(
             "missing-glyph",
-            format!("SVG {}: {}", path.display(), failures.join(" ")),
+            format!(
+                "SVG {}: {}",
+                path.display(),
+                failures
+                    .iter()
+                    .take(16)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
         ));
     }
     let size = tree.size().to_int_size();
