@@ -6,6 +6,7 @@ mod math;
 pub mod model;
 mod pdf;
 mod profiles;
+mod svg;
 
 pub fn compile(input: &model::Input) -> model::Result<(Vec<u8>, model::Report)> {
     let started = std::time::Instant::now();

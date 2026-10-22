@@ -1,4 +1,4 @@
-//! Preserve many-glyph Unicode clusters as single PDF characters. The subset is
+//! Preserve shaped outlines and individual RTL character positions. The subset is
 //! trusted parser output, but every generated TrueType field remains bounded.
 use crate::{
     fonts::Unit,
@@ -112,6 +112,19 @@ pub fn build(
         }
         if next == u16::MAX {
             return Err(invalid());
+        }
+        if unit.components.is_empty() {
+            // A zero-length glyf record is the TrueType representation of an
+            // empty character. Keep its metrics and Unicode mapping without
+            // inventing an invalid composite with no component records.
+            offsets.push(glyf.len() as u32);
+            let advance = u16::try_from(unit.advance).map_err(|_| invalid())?;
+            metrics.extend_from_slice(&advance.to_be_bytes());
+            metrics.extend_from_slice(&0i16.to_be_bytes());
+            advance_max = advance_max.max(advance);
+            gids.insert(*cid, next);
+            next += 1;
+            continue;
         }
         let mut bbox = [i16::MAX, i16::MAX, i16::MIN, i16::MIN];
         for (old, x, y) in &unit.components {

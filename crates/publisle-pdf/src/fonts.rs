@@ -8,7 +8,8 @@ pub struct Font {
     pub role: String,
     pub glyphs: BTreeMap<Unit, u16>,
 }
-// One Unicode shaping cluster is one PDF character, including all its marks.
+// PDF character outlines and Unicode mappings. RTL cluster characters retain
+// individual positions; Latin ligatures can map to a Unicode sequence.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Unit {
     pub components: Vec<(u16, i32, i32)>,
@@ -100,11 +101,25 @@ impl Fonts {
         self.fonts
             .iter()
             .position(|f| f.role == role && supports(f))
+            .or_else(|| {
+                self.fonts
+                    .iter()
+                    .position(|f| f.role == "fallback" && supports(f))
+            })
             .or_else(|| self.fonts.iter().position(supports))
             .ok_or_else(|| {
                 Diagnostic::new(
                     "missing-glyph",
-                    format!("No pinned font supports {value:?}."),
+                    format!(
+                        "No pinned font covers this run: {:?} ({}).",
+                        value.chars().take(80).collect::<String>(),
+                        value
+                            .chars()
+                            .take(8)
+                            .map(|c| format!("U+{:04X}", u32::from(c)))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
                 )
             })
     }
@@ -140,6 +155,7 @@ impl Fonts {
             let font = &mut self.fonts[font_index];
             let face = Face::from_slice(&font.bytes, font.index).unwrap();
             let scale = size / face.units_per_em() as f32;
+            let true_type = face.tables().glyf.is_some();
             let mut buffer = UnicodeBuffer::new();
             buffer.push_str(slice);
             buffer.guess_segment_properties();
@@ -177,7 +193,10 @@ impl Fonts {
                     if info.glyph_id == 0 {
                         return Err(Diagnostic::new(
                             "missing-glyph",
-                            format!("Font shaping failed for {slice:?}."),
+                            format!(
+                                "Font shaping failed for {:?}.",
+                                slice.chars().take(80).collect::<String>()
+                            ),
                         ));
                     }
                     components.push((info.glyph_id as u16, advance + pos.x_offset, pos.y_offset));
@@ -190,28 +209,81 @@ impl Fonts {
                         "A shaping cluster exceeds 64 glyphs.",
                     ));
                 }
-                let unit = Unit {
-                    components,
-                    advance,
-                    unicode: slice[start..end].to_string(),
+                let characters: Vec<_> = slice[start..end].char_indices().collect();
+                let is_mark = |c| {
+                    unicode_bidi::bidi_class(c) == unicode_bidi::BidiClass::NSM
+                        || c == '\u{200c}'
+                        || c == '\u{200d}'
                 };
-                let next = u16::try_from(font.glyphs.len() + 1).map_err(|_| {
-                    Diagnostic::new(
-                        "glyph-limit",
-                        "A font exceeded 65534 distinct glyph mappings.",
-                    )
-                })?;
-                let cid = *font.glyphs.entry(unit).or_insert(next);
-                logical.push((
-                    run.start + start,
-                    Glyph {
-                        font: font_index,
-                        cid,
-                        x: origin,
-                        y: 0.,
-                        advance: advance as f32 * scale,
-                    },
-                ));
+                let bases = characters.iter().filter(|(_, c)| !is_mark(*c)).count();
+                let mut emit = |unit: Unit, offset: usize, position: i32| -> Result<()> {
+                    let unit_advance = unit.advance;
+                    let next = u16::try_from(font.glyphs.len() + 1).map_err(|_| {
+                        Diagnostic::new(
+                            "glyph-limit",
+                            "A font exceeded 65534 distinct glyph mappings.",
+                        )
+                    })?;
+                    let cid = *font.glyphs.entry(unit).or_insert(next);
+                    logical.push((
+                        run.start + start + offset,
+                        Glyph {
+                            font: font_index,
+                            cid,
+                            x: origin + position as f32 * scale,
+                            y: 0.,
+                            advance: unit_advance as f32 * scale,
+                        },
+                    ));
+                    Ok(())
+                };
+                if direction && true_type && characters.len() > 1 && bases > 0 {
+                    // Give each Unicode scalar a real character position. Mapping
+                    // an Arabic ligature/mark cluster to one PDF character lets
+                    // geometry-based readers reverse its *internal* characters.
+                    // Only the first CID paints the original shaped outline;
+                    // the remaining CIDs are empty glyphs with real Unicode maps.
+                    let mut base = 0;
+                    let mut previous_left = 0;
+                    for (number, (offset, character)) in characters.into_iter().enumerate() {
+                        let (position, width) = if is_mark(character) {
+                            (previous_left - 1, 0)
+                        } else {
+                            let left = advance * (bases - base - 1) as i32 / bases as i32;
+                            let right = advance * (bases - base) as i32 / bases as i32;
+                            base += 1;
+                            previous_left = left;
+                            (left, right - left)
+                        };
+                        let components = if number == 0 {
+                            components
+                                .iter()
+                                .map(|(gid, dx, dy)| (*gid, dx - position, *dy))
+                                .collect()
+                        } else {
+                            vec![]
+                        };
+                        emit(
+                            Unit {
+                                components,
+                                advance: width,
+                                unicode: character.to_string(),
+                            },
+                            offset,
+                            position,
+                        )?;
+                    }
+                } else {
+                    emit(
+                        Unit {
+                            components,
+                            advance,
+                            unicode: slice[start..end].to_string(),
+                        },
+                        0,
+                        0,
+                    )?;
+                }
                 x += advance as f32 * scale;
             }
             // Physical positions retain visual order; stream characters retain source order.
@@ -222,5 +294,48 @@ impl Fonts {
             glyphs: glyphs.into_iter().map(|(_, glyph)| glyph).collect(),
             width: x,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn rtl_ligature_and_mark_characters_have_individual_unicode_positions() {
+        let directory =
+            std::env::var_os("PUBLISLE_TEST_FONT_DIR").expect("Pinned test fonts are required");
+        let mut fonts = Fonts::load(&[FontSpec {
+            path: std::path::Path::new(&directory).join("DejaVuSans.ttf"),
+            role: "regular".into(),
+            index: 0,
+        }])
+        .unwrap();
+        let input = "العَرَبِيَّة لا للاختبار";
+        let shaped = fonts.shape(input, 12., "regular", true).unwrap();
+        let reconstructed: String = shaped
+            .glyphs
+            .iter()
+            .map(|glyph| {
+                let unit = fonts.fonts[glyph.font]
+                    .glyphs
+                    .iter()
+                    .find(|(_, cid)| **cid == glyph.cid)
+                    .unwrap()
+                    .0;
+                assert_eq!(unit.unicode.chars().count(), 1);
+                unit.unicode.clone()
+            })
+            .collect();
+        assert_eq!(reconstructed, input);
+        assert!(
+            (shaped.glyphs.iter().map(|glyph| glyph.advance).sum::<f32>() - shaped.width).abs()
+                < 0.01
+        );
+        assert!(
+            fonts.fonts[0]
+                .glyphs
+                .keys()
+                .any(|unit| unit.components.is_empty())
+        );
     }
 }

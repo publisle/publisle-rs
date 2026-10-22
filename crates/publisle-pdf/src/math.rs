@@ -13,6 +13,7 @@ pub enum Math {
     Space(f32),
     Fraction(Box<Math>, Box<Math>),
     Root(Box<Math>),
+    IndexedRoot(Box<Math>, Box<Math>),
     Scripts {
         base: Box<Math>,
         sub: Option<Box<Math>>,
@@ -64,6 +65,9 @@ impl Math {
             Self::Space(w) => format!("<mspace width=\"{w}em\"/>"),
             Self::Fraction(a, b) => format!("<mfrac>{}{}</mfrac>", a.mathml(), b.mathml()),
             Self::Root(a) => format!("<msqrt>{}</msqrt>", a.mathml()),
+            Self::IndexedRoot(index, a) => {
+                format!("<mroot>{}{}</mroot>", a.mathml(), index.mathml())
+            }
             Self::Scripts { base, sub, sup } => match (sub, sup) {
                 (Some(a), Some(b)) => format!(
                     "<msubsup>{}{}{}</msubsup>",
@@ -358,9 +362,35 @@ impl Parser {
             "sqrt" => {
                 self.skip();
                 if self.input.get(self.cursor) == Some(&'[') {
-                    return Err(
-                        self.error("Indexed roots are not supported by this math contract.")
-                    );
+                    self.cursor += 1;
+                    let start = self.cursor;
+                    let mut braces = 0usize;
+                    loop {
+                        match self.input.get(self.cursor) {
+                            Some(']') if braces == 0 => break,
+                            Some('{') => braces += 1,
+                            Some('}') if braces > 0 => braces -= 1,
+                            None => return Err(self.error("Unclosed root index.")),
+                            _ => {}
+                        }
+                        self.cursor += 1;
+                    }
+                    if self.cursor == start {
+                        return Err(self.error("Root index cannot be empty."));
+                    }
+                    // Parse with the same bounded parser so an index cannot
+                    // reset the depth/node budget through recursive parse calls.
+                    let index_source: Vec<char> = self.input[start..self.cursor].to_vec();
+                    let outer_input = std::mem::replace(&mut self.input, index_source);
+                    let outer_cursor = self.cursor + 1;
+                    self.cursor = 0;
+                    let index = self.row(false)?;
+                    self.input = outer_input;
+                    self.cursor = outer_cursor;
+                    return Ok(Math::IndexedRoot(
+                        Box::new(index),
+                        Box::new(self.argument()?),
+                    ));
                 }
                 Ok(Math::Root(Box::new(self.argument()?)))
             }
@@ -691,6 +721,21 @@ pub fn layout(node: &Math, fonts: &mut Fonts, size: f32, color: [f32; 3]) -> Res
             out.width += script_width;
             Ok(out)
         }
+        Math::IndexedRoot(index, node) => {
+            let root = layout(&Math::Root(node.clone()), fonts, size, color)?;
+            let index = layout(index, fonts, size * 0.55, color)?;
+            let shift = index.width.max(size * 0.2);
+            let y = size * 0.6;
+            let mut out = BoxLayout {
+                width: root.width + shift,
+                ascent: root.ascent.max(y + index.ascent),
+                descent: root.descent,
+                ..Default::default()
+            };
+            out.append(index, 0., y);
+            out.append(root, shift, 0.);
+            Ok(out)
+        }
         Math::Root(node) => {
             let b = layout(node, fonts, size, color)?;
             let root = layout(&Math::Operator("√".into()), fonts, size * 1.2, color)?;
@@ -855,6 +900,14 @@ mod tests {
         assert!(math.contains("<mtext>Residual energy</mtext>"));
         assert!(math.contains("<menclose"));
         assert!(math.contains("ℝ"));
-        assert!(parse(r"\sqrt[3]{x}").is_err());
+        assert!(
+            parse(r"\sqrt[3]{x}")
+                .unwrap()
+                .mathml()
+                .contains("<mroot><mrow><mi>x</mi></mrow><mrow><mn>3</mn></mrow></mroot>")
+        );
+        for source in [r"\sqrt[]{x}", r"\sqrt[3{x}", r"\sqrt[\input{x}]{y}"] {
+            assert!(parse(source).is_err(), "{source}");
+        }
     }
 }

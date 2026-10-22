@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "77a04eec404fcb1b10142d018e97b174a129b45c",
+  "referencePolicy": "Build the worker from this exact source checkout and the digest-pinned TeX image. Baselines must never be regenerated from candidate source.",
+  "files": {
+    "examples/articles/ieee-journal.md": "8ffbc95ddb2d4106f41c610f7e9dbfa240a7b123deeeb74ebb46bd06cb7601e9",
+    "examples/articles/article-arabic.md": "e7efe2dff0fb03a36be28c5717fe3f1afa00bc50c0456f6831c02413e2ffb8cf",
+    "examples/articles/paper-convergence.png": "6b415d984d49287256b1cf6b1aaa26a99f240547827097485b4c16e5caf407af",
+    "sites/www/src/lib/playground-examples.ts": "6f02f2a67a886ed3931c1481e6f8eb3d43e8cb477f79dbd694d5a27b0a45b089",
+    "sites/www/public/fft-spectrum.svg": "056c631851181e5040536d364bb5150c1417c2520255a6e78c5ee875866320d1",
+    "sites/www/public/fft-spectrum-dark.svg": "ebeda81bbcc2f7b53bcc15f1fcff314012aa97f6caf740b89ea9539ebeb78d28",
+    "sites/www/public/gibbs-overshoot.svg": "9c3c977f8a3a7fe2db6e70d7204adb4f1d66af38e8702a22ad1c0bbc2fd35574",
+    "sites/www/public/gibbs-overshoot-dark.svg": "d17112a3fcf402f26bc819b3fbdbbdc3014c761e4493b615f961ce39471abb64",
+    "deploy/vps/worker.Dockerfile": "27fe98b47e399a3b5bb27eb4b223b156e2d1a8d6134a14d79f3329f555386d61",
+    "packages/research/compiler/release.json": "5d951350da3a065287335a13a54f6bf47b4ffbb7e1045dbdbb107acb7bb357f7"
+  },
+  "comparison": {
+    "maximumGeometryErrorPt": 0.25,
+    "rasterDpi": 150,
+    "minimumPageSsim": 0.995,
+    "minimumFigureSsim": 0.995,
+    "matchingLineBreaks": true,
+    "matchingPageBreaks": true
+  }
+}
