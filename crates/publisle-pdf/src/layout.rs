@@ -76,7 +76,7 @@ enum PieceKind {
         target: Option<String>,
         strike: bool,
     },
-    Math(BoxLayout, String),
+    Math(BoxLayout, String, String),
     Break,
 }
 struct Builder<'a> {
@@ -623,7 +623,7 @@ impl Builder<'_> {
                         width: b.width,
                         ascent: b.ascent,
                         descent: b.descent,
-                        kind: PieceKind::Math(b, xml),
+                        kind: PieceKind::Math(b, xml, value.clone()),
                         break_after: false,
                     });
                     continue;
@@ -741,8 +741,9 @@ impl Builder<'_> {
                             },
                         );
                     }
-                    PieceKind::Math(b, xml) => {
-                        let formula = self.tag("Formula", Some(tag), None, Some(xml), false);
+                    PieceKind::Math(b, xml, alternative) => {
+                        let formula =
+                            self.tag("Formula", Some(tag), Some(alternative), Some(xml), false);
                         self.draw(Some(formula), x, self.cursor, DrawKind::Math(b));
                     }
                     PieceKind::Break => {}
@@ -952,7 +953,7 @@ impl Builder<'_> {
                 self.ensure(h)?;
                 self.cursor -= b.ascent + 6.;
                 let x = self.x() + (self.width() - b.width) / 2.;
-                let tag=self.tag("Formula",None,None,Some(format!("<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\">{}</math>",tree.mathml())),false);
+                let tag=self.tag("Formula",None,Some(value.clone()),Some(format!("<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\">{}</math>",tree.mathml())),false);
                 self.output.tags[tag].label = label.clone();
                 self.draw(Some(tag), x, self.cursor, DrawKind::Math(b));
                 if label.is_some() {
@@ -1009,9 +1010,18 @@ impl Builder<'_> {
                     .path
                     .extension()
                     .and_then(|s| s.to_str())
-                    .is_some_and(|s| s.eq_ignore_ascii_case("pdf"))
+                    .is_some_and(|s| s.eq_ignore_ascii_case("pdf") || s.eq_ignore_ascii_case("svg"))
                 {
-                    let pdf = crate::assets::PdfAsset::load(&asset.path)?;
+                    let pdf = if asset
+                        .path
+                        .extension()
+                        .and_then(|s| s.to_str())
+                        .is_some_and(|s| s.eq_ignore_ascii_case("svg"))
+                    {
+                        crate::assets::PdfAsset::from_svg(&asset.path, &self.output.fonts)?
+                    } else {
+                        crate::assets::PdfAsset::load(&asset.path)?
+                    };
                     let width = pdf.bbox[2] - pdf.bbox[0];
                     let height = pdf.bbox[3] - pdf.bbox[1];
                     let scale = (self.width() / width).min(240. / height).min(1.);
@@ -1205,9 +1215,14 @@ impl Builder<'_> {
                                             },
                                         );
                                     }
-                                    PieceKind::Math(b, xml) => {
-                                        let tag =
-                                            self.tag("Formula", Some(cell), None, Some(xml), false);
+                                    PieceKind::Math(b, xml, alternative) => {
+                                        let tag = self.tag(
+                                            "Formula",
+                                            Some(cell),
+                                            Some(alternative),
+                                            Some(xml),
+                                            false,
+                                        );
                                         self.draw(Some(tag), x, y, DrawKind::Math(b));
                                     }
                                     PieceKind::Break => {}
@@ -1471,7 +1486,7 @@ mod bidi_tests {
         let mut prefix = piece("before ");
         prefix.width = 75.;
         let equation = Piece {
-            kind: PieceKind::Math(BoxLayout::default(), String::new()),
+            kind: PieceKind::Math(BoxLayout::default(), String::new(), String::new()),
             width: 24.,
             ascent: 8.,
             descent: 2.,

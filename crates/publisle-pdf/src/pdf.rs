@@ -56,9 +56,22 @@ fn text(
     content.end_text();
 }
 
+fn structure_role(role: &str, ua1: bool) -> &str {
+    if ua1 {
+        match role {
+            "Title" => "H1",
+            "FENote" => "Note",
+            _ => role,
+        }
+    } else {
+        role
+    }
+}
+
 pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
     let mut pdf = Pdf::new();
-    pdf.set_version(2, 0);
+    let ua1 = standard == Some("ua-1");
+    pdf.set_version(if ua1 { 1 } else { 2 }, if ua1 { 7 } else { 0 });
     let mut ids = Ids(1);
     let catalog = ids.next();
     let page_tree = ids.next();
@@ -205,12 +218,7 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
     // This records the requested standard; independent validation is still required.
     let standard_xmp = match standard {
         Some("ua-2") => "<pdfuaid:part>2</pdfuaid:part><pdfuaid:rev>2024</pdfuaid:rev>",
-        Some("ua-1") => {
-            return Err(Diagnostic::new(
-                "unsupported-standard",
-                "The native writer uses PDF 2.0; PDF/UA-1 is not supported.",
-            ));
-        }
+        Some("ua-1") => "<pdfuaid:part>1</pdfuaid:part>",
         None => "",
         Some(_) => {
             return Err(Diagnostic::new(
@@ -249,7 +257,9 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
         for draw in &page.draws {
             if let Some(tag) = draw.tag {
                 content
-                    .begin_marked_content_with_properties(Name(layout.tags[tag].role.as_bytes()))
+                    .begin_marked_content_with_properties(Name(
+                        structure_role(&layout.tags[tag].role, ua1).as_bytes(),
+                    ))
                     .properties()
                     .identify(mcid);
                 contents[tag].push((rank, page_ids[page_index], mcid));
@@ -543,19 +553,23 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
         let mut writer = pdf.indirect(tag_ids[i]).dict();
         writer
             .pair(Name(b"Type"), Name(b"StructElem"))
-            .pair(Name(b"S"), Name(tag.role.as_bytes()))
+            .pair(Name(b"S"), Name(structure_role(&tag.role, ua1).as_bytes()))
             .pair(
+                Name(b"P"),
+                tag.parent.map(|p| tag_ids[p]).unwrap_or(document),
+            );
+        if !ua1 {
+            writer.pair(
                 Name(b"NS"),
                 if ["BlockQuote", "Code", "Note", "BibEntry"].contains(&tag.role.as_str()) {
                     namespace_legacy
                 } else {
                     namespace
                 },
-            )
-            .pair(
-                Name(b"P"),
-                tag.parent.map(|p| tag_ids[p]).unwrap_or(document),
             );
+        } else if tag.role == "FENote" {
+            writer.pair(Name(b"ID"), TextStr(&format!("note-{i}")));
+        }
         if let Some(alt) = &tag.alt {
             writer.pair(Name(b"Alt"), TextStr(alt));
         }
@@ -631,16 +645,20 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
                 Name(b"ParentTreeNextKey"),
                 (layout.pages.len() + links.len()) as i32,
             );
-        root.insert(Name(b"Namespaces"))
-            .array()
-            .items([namespace, namespace_legacy]);
+        if !ua1 {
+            root.insert(Name(b"Namespaces"))
+                .array()
+                .items([namespace, namespace_legacy]);
+        }
     }
     {
         let mut doc = pdf.indirect(document).dict();
         doc.pair(Name(b"Type"), Name(b"StructElem"))
             .pair(Name(b"S"), Name(b"Document"))
-            .pair(Name(b"NS"), namespace)
             .pair(Name(b"P"), structure);
+        if !ua1 {
+            doc.pair(Name(b"NS"), namespace);
+        }
         doc.insert(Name(b"K")).array().items(
             layout
                 .tags

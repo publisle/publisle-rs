@@ -11,6 +11,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-core
     && cp /usr/share/fonts/truetype/noto/NotoSerif-Regular.ttf /usr/share/fonts/truetype/noto/NotoSerif-Bold.ttf \
           /usr/share/fonts/truetype/noto/NotoSerif-Italic.ttf /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf \
           /usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf \
+          /usr/share/fonts/truetype/noto/NotoSerif-BoldItalic.ttf \
+          /usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf \
+          /usr/share/fonts/truetype/dejavu/DejaVuSansMono-Oblique.ttf \
+          /usr/share/fonts/truetype/dejavu/DejaVuSansMono-BoldOblique.ttf \
+          /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf \
+          /usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf \
+          /usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf \
           /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc /fonts/ \
     && cp /usr/share/doc/fonts-noto-core/copyright /fonts/licenses/noto-core.txt \
     && cp /usr/share/doc/fonts-noto-cjk/copyright /fonts/licenses/noto-cjk.txt \

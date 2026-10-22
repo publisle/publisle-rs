@@ -64,6 +64,26 @@ pub struct PdfAsset {
 impl PdfAsset {
     pub fn load(path: &Path) -> Result<Self> {
         let doc = Document::load(path).map_err(invalid)?;
+        Self::from_document(doc)
+    }
+    pub fn from_svg(path: &Path, fonts: &Fonts) -> Result<Self> {
+        let tree = crate::svg::tree(path, fonts)?;
+        let bytes = svg2pdf::to_pdf(
+            &tree,
+            svg2pdf::ConversionOptions {
+                embed_text: true,
+                raster_scale: 1.0,
+                ..Default::default()
+            },
+            svg2pdf::PageOptions { dpi: 96.0 },
+        )
+        .map_err(invalid)?;
+        if bytes.len() > 32 * 1024 * 1024 {
+            return Err(invalid("Converted SVG exceeds 32 MiB."));
+        }
+        Self::from_document(Document::load_mem(&bytes).map_err(invalid)?)
+    }
+    fn from_document(doc: Document) -> Result<Self> {
         if doc.is_encrypted() || doc.objects.len() > 10000 {
             return Err(invalid("PDF figures must be unencrypted and bounded."));
         }

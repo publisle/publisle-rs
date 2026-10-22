@@ -27,7 +27,7 @@ pub(crate) fn font_database(fonts: &Fonts) -> Result<fontdb::Database> {
                 .clone();
             // A TTC may contain many language faces. Only expose the pinned index.
             if face.index != font.index {
-                database.remove(id);
+                database.remove_face(id);
                 continue;
             }
             let family = face
@@ -59,7 +59,7 @@ pub(crate) fn font_database(fonts: &Fonts) -> Result<fontdb::Database> {
                         .push((alias.into(), fontdb::Language::English_UnitedStates));
                 }
             }
-            database.remove(id);
+            database.remove_face(id);
             database.push_face_info(face);
         }
     }
