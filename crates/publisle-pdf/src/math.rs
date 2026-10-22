@@ -904,7 +904,7 @@ mod tests {
             parse(r"\sqrt[3]{x}")
                 .unwrap()
                 .mathml()
-                .contains("<mroot><mi>x</mi><mrow><mn>3</mn></mrow></mroot>")
+                .contains("<mroot><mrow><mi>x</mi></mrow><mrow><mn>3</mn></mrow></mroot>")
         );
         for source in [r"\sqrt[]{x}", r"\sqrt[3{x}", r"\sqrt[\input{x}]{y}"] {
             assert!(parse(source).is_err(), "{source}");

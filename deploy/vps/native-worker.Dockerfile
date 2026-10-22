@@ -6,7 +6,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,targe
     cargo build --release --locked && cp target/release/publisle-pdf /publisle-pdf
 
 FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS fonts
-RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-core fonts-noto-cjk fonts-dejavu-core \
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-core fonts-noto-cjk fonts-dejavu-core fonts-dejavu-extra \
     && mkdir -p /fonts/licenses \
     && cp /usr/share/fonts/truetype/noto/NotoSerif-Regular.ttf /usr/share/fonts/truetype/noto/NotoSerif-Bold.ttf \
           /usr/share/fonts/truetype/noto/NotoSerif-Italic.ttf /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf \
