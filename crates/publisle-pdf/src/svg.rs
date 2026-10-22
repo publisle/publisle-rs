@@ -110,10 +110,13 @@ pub(crate) fn tree(path: &Path, fonts: &Fonts) -> Result<usvg::Tree> {
     options.font_resolver.select_font = Box::new(move |font, db| {
         let selected = selector(font, db);
         if selected.is_none() {
-            missing
-                .lock()
-                .unwrap()
-                .push(format!("No pinned face for {:?}.", font.families()));
+            missing.lock().unwrap().insert(format!(
+                "No pinned face for {}.",
+                format!("{:?}", font.families())
+                    .chars()
+                    .take(512)
+                    .collect::<String>()
+            ));
         }
         selected
     });
