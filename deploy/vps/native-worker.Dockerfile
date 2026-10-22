@@ -3,7 +3,7 @@ WORKDIR /build
 COPY native/pdf/Cargo.toml native/pdf/Cargo.lock ./
 COPY native/pdf/src ./src
 RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/build/target \
-    cargo build --release --locked && cp target/release/publisle-pdf /publisle-pdf
+    CARGO_BUILD_JOBS=2 cargo build --release --locked && cp target/release/publisle-pdf /publisle-pdf
 
 FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS fonts
 RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-core fonts-noto-cjk fonts-dejavu-core fonts-dejavu-extra \

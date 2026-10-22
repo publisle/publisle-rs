@@ -1,4 +1,4 @@
-//! Preserve many-glyph Unicode clusters as single PDF characters. The subset is
+//! Preserve shaped outlines and individual RTL character positions. The subset is
 //! trusted parser output, but every generated TrueType field remains bounded.
 use crate::{
     fonts::Unit,

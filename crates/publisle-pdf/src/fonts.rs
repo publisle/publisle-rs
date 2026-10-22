@@ -8,7 +8,8 @@ pub struct Font {
     pub role: String,
     pub glyphs: BTreeMap<Unit, u16>,
 }
-// One Unicode shaping cluster is one PDF character, including all its marks.
+// PDF character outlines and Unicode mappings. RTL cluster characters retain
+// individual positions; Latin ligatures can map to a Unicode sequence.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Unit {
     pub components: Vec<(u16, i32, i32)>,
@@ -100,11 +101,25 @@ impl Fonts {
         self.fonts
             .iter()
             .position(|f| f.role == role && supports(f))
+            .or_else(|| {
+                self.fonts
+                    .iter()
+                    .position(|f| f.role == "fallback" && supports(f))
+            })
             .or_else(|| self.fonts.iter().position(supports))
             .ok_or_else(|| {
                 Diagnostic::new(
                     "missing-glyph",
-                    format!("No pinned font supports {value:?}."),
+                    format!(
+                        "No pinned font covers this run: {:?} ({}).",
+                        value.chars().take(80).collect::<String>(),
+                        value
+                            .chars()
+                            .take(8)
+                            .map(|c| format!("U+{:04X}", u32::from(c)))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
                 )
             })
     }
@@ -178,7 +193,10 @@ impl Fonts {
                     if info.glyph_id == 0 {
                         return Err(Diagnostic::new(
                             "missing-glyph",
-                            format!("Font shaping failed for {slice:?}."),
+                            format!(
+                                "Font shaping failed for {:?}.",
+                                slice.chars().take(80).collect::<String>()
+                            ),
                         ));
                     }
                     components.push((info.glyph_id as u16, advance + pos.x_offset, pos.y_offset));
@@ -226,15 +244,15 @@ impl Fonts {
                     // Only the first CID paints the original shaped outline;
                     // the remaining CIDs are empty glyphs with real Unicode maps.
                     let mut base = 0;
-                    let mut previous_right = advance;
+                    let mut previous_left = 0;
                     for (number, (offset, character)) in characters.into_iter().enumerate() {
                         let (position, width) = if is_mark(character) {
-                            (previous_right, 0)
+                            (previous_left - 1, 0)
                         } else {
                             let left = advance * (bases - base - 1) as i32 / bases as i32;
                             let right = advance * (bases - base) as i32 / bases as i32;
                             base += 1;
-                            previous_right = right;
+                            previous_left = left;
                             (left, right - left)
                         };
                         let components = if number == 0 {
