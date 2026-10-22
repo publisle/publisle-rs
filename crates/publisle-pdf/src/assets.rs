@@ -18,42 +18,8 @@ pub fn raster(path: &Path, fonts: &Fonts) -> Result<image::DynamicImage> {
         .and_then(|s| s.to_str())
         .is_some_and(|s| s.eq_ignore_ascii_case("svg"))
     {
-        let bytes = std::fs::read(path).map_err(invalid)?;
-        if bytes.len() > 4 * 1024 * 1024 {
-            return Err(invalid("SVG exceeds 4 MiB."));
-        }
-        let text = std::str::from_utf8(&bytes)
-            .map_err(invalid)?
-            .to_ascii_lowercase();
-        if [
-            "<!doctype",
-            "<!entity",
-            "<script",
-            "<foreignobject",
-            "<image",
-            "@import",
-        ]
-        .iter()
-        .any(|token| text.contains(token))
-        {
-            return Err(invalid(
-                "SVG contains unsupported active or external content.",
-            ));
-        }
-        let mut options = resvg::usvg::Options::default();
-        options.image_href_resolver.resolve_string = Box::new(|_, _| None);
-        options.font_family = "Noto Serif".into();
-        for font in &fonts.fonts {
-            options.fontdb_mut().load_font_data(font.bytes.clone());
-        }
-        let tree = resvg::usvg::Tree::from_data(&bytes, &options).map_err(invalid)?;
+        let tree = crate::svg::tree(path, fonts)?;
         let size = tree.size().to_int_size();
-        if size.width() > 8000
-            || size.height() > 8000
-            || u64::from(size.width()) * u64::from(size.height()) > 8_000_000
-        {
-            return Err(invalid("SVG exceeds the pixel limit."));
-        }
         let mut pixmap = resvg::tiny_skia::Pixmap::new(size.width(), size.height())
             .ok_or_else(|| invalid("Cannot allocate SVG image."))?;
         resvg::render(

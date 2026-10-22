@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "releasePolicy": "All gates must pass for one complete release. Never replace reference output to make candidate output pass.",
+  "profiles": [
+    "article",
+    "article-arabic",
+    "ieee-journal",
+    "acm-journal",
+    "springer-journal",
+    "elsevier-numeric",
+    "elsevier-author-date"
+  ],
+  "comparison": {
+    "maximumGeometryErrorPt": 0.25,
+    "rasterDpi": 150,
+    "minimumPageSsim": 0.995,
+    "minimumFigureSsim": 0.995,
+    "matchingLineBreaks": true,
+    "matchingPageBreaks": true
+  },
+  "gates": [
+    {
+      "id": "svg-fonts",
+      "status": "implementation",
+      "requirement": "Pinned aliases, generic families, selected TTC indices, weight/style, no missing glyphs; all four Fourier SVGs"
+    },
+    {
+      "id": "vector-figures",
+      "status": "blocked",
+      "requirement": "SVG and PDF vector artwork, selectable text, transparency, clipping, gradients and bounded filter rasterization"
+    },
+    {
+      "id": "text-and-inline",
+      "status": "blocked",
+      "requirement": "All projected inline kinds, marks, links, references, mixed scripts, fallback shaping and CJK wrapping"
+    },
+    {
+      "id": "layout-parity",
+      "status": "blocked",
+      "requirement": "Frozen legacy baselines for all profiles; fonts, front matter, paragraphs, lists, headings, floats, footnotes, columns and running furniture"
+    },
+    {
+      "id": "tables",
+      "status": "blocked",
+      "requirement": "Long tables, repeated headers, wrapping, sizing and tagged header associations without clipped or lost rows"
+    },
+    {
+      "id": "math",
+      "status": "blocked",
+      "requirement": "Supported math corpus, indexed roots, operators, scripts, stretchy delimiters, equation numbering and MathML"
+    },
+    {
+      "id": "arabic",
+      "status": "blocked",
+      "requirement": "Correct bidi, ligatures, diacritics and actual copying in Acrobat and Firefox PDF.js, plus Poppler extraction"
+    },
+    {
+      "id": "pdf-ua",
+      "status": "blocked",
+      "requirement": "Strict independent PDF/UA-1 and PDF/UA-2 validation; tags, language, reading order, alternatives, table headers, links and MathML"
+    },
+    {
+      "id": "python-free-pdf",
+      "status": "implementation",
+      "requirement": "PDF runtime, installation, validation, release and deployment require no Python; independent consumer is retained"
+    },
+    {
+      "id": "native-distribution",
+      "status": "blocked",
+      "requirement": "Pinned npm binaries and licensed fonts for Linux glibc x64/arm64, macOS x64/arm64 and Windows x64; offline clean installs"
+    },
+    {
+      "id": "sandbox",
+      "status": "blocked",
+      "requirement": "Bounded inputs, no network or path escapes, malformed asset rejection, cancellation, exclusive output creation and cleanup"
+    },
+    {
+      "id": "hosted-performance",
+      "status": "blocked",
+      "requirement": "0.5 aggregate CPU, 512 MiB, no swap, five warmups and thirty uncached observations per profile, p95 below five seconds on fixed fixtures"
+    }
+  ]
+}
