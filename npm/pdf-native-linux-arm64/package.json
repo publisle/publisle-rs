@@ -1,6 +1,6 @@
 {
   "name": "@publisle/pdf-native-linux-arm64",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Pinned Publisle native PDF compiler and fonts for linux/arm64",
   "license": "MIT",
