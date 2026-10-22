@@ -1,0 +1,33 @@
+{
+  "name": "@publisle/pdf-native-linux-arm64",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Pinned Publisle native PDF compiler and fonts for linux/arm64",
+  "license": "MIT",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "bin",
+    "fonts",
+    "licenses",
+    "artifact.json",
+    "fonts.json",
+    "LICENSE",
+    "README.md"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    "./artifact.json": "./artifact.json",
+    "./fonts.json": "./fonts.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

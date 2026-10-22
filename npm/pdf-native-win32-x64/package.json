@@ -1,0 +1,30 @@
+{
+  "name": "@publisle/pdf-native-win32-x64",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Pinned Publisle native PDF compiler and fonts for win32/x64",
+  "license": "MIT",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin",
+    "fonts",
+    "licenses",
+    "artifact.json",
+    "fonts.json",
+    "LICENSE",
+    "README.md"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    "./artifact.json": "./artifact.json",
+    "./fonts.json": "./fonts.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
