@@ -39,7 +39,12 @@ fn text(
     content.set_fill_rgb(color[0], color[1], color[2]);
     content.begin_text();
     let mut font = usize::MAX;
-    for glyph in &shaped.glyphs {
+    // Emit positioned characters in visual order. Geometry-based readers then
+    // apply bidi once to the whole word, including its combining marks. The
+    // structure tree retains the authored logical text and reading order.
+    let mut glyphs: Vec<_> = shaped.glyphs.iter().collect();
+    glyphs.sort_by(|a, b| a.x.total_cmp(&b.x));
+    for glyph in glyphs {
         if glyph.font != font {
             font = glyph.font;
             let name = font_name(font);

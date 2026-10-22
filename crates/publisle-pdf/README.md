@@ -8,7 +8,7 @@ using the existing research source generators.
 
 ```sh
 cargo build --release --locked --manifest-path native/pdf/Cargo.toml
-cargo test --locked --manifest-path native/pdf/Cargo.toml
+PUBLISLE_TEST_FONT_DIR=/usr/share/fonts/truetype/dejavu cargo test --locked --manifest-path native/pdf/Cargo.toml
 cargo clippy --locked --manifest-path native/pdf/Cargo.toml --all-targets -- -D warnings
 native/pdf/target/release/publisle-pdf INPUT.json NEW-OUTPUT.pdf
 ```
@@ -47,11 +47,12 @@ image, resource-budget, content, visual-layout, PDF/UA-2 and speed verification.
 Math is a bounded parser for the supported Publisle math contract, not a TeX
 interpreter. Unknown commands, malformed groups, oversized expressions and
 unsupported glyphs return diagnostics rather than silently losing content.
-Indexed roots and arbitrary macros/packages are currently unsupported.
+Indexed roots are supported. Arbitrary macros/packages remain unsupported.
 TrueType clusters preserve Unicode text even when one character needs several
-shaped glyphs. Arabic geometry-based extraction still differs between readers for some ligatures
-and diacritics, despite correct logical tags. Arabic remains on the legacy hosted
-engine pending copy/paste parity. Complex CFF1 clusters that cannot preserve this mapping fail with
+shaped glyphs. Arabic ligatures and diacritics have individual Unicode positions;
+Poppler and PDF.js extraction are independently checked in the hosted tests.
+Arabic remains on the legacy hosted engine pending complete layout and interactive
+reader verification. Complex CFF1 clusters that cannot preserve this mapping fail with
 an actionable font diagnostic; use a TrueType font for those scripts.
 
 PDF/UA metadata records the requested standard. Compliance requires independent

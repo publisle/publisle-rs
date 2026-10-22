@@ -1,5 +1,30 @@
 # Native PDF rollout evidence — 22 October 2026
 
+## Current replacement candidate
+
+The complete native replacement is **not ready for release**. The frozen legacy
+comparison completed locally for all seven profiles and both website examples.
+All nine comparisons failed the required 0.25 pt geometry / 0.995 SSIM gates.
+The article fixture alone had 156 geometry/text differences, with page SSIM
+between 0.697 and 0.896. Matching profile dimensions does not reproduce the
+legacy fonts, line breaking, front matter, floats, mathematics or pagination.
+
+Local verification now includes all 721 JavaScript tests, 14 Rust tests,
+TypeScript checking, Clippy, and the optimized worker container build using two
+compiler workers. Hosted tests check Poppler and PDF.js extraction independently;
+interactive Acrobat selection still needs separate evidence. Every profile is
+also tested against strict PDF/UA-1 and PDF/UA-2 validation. Passing validation
+does not close the layout, reader, distribution or performance gates in
+[READINESS.json](READINESS.json).
+
+Local comparison artifacts are retained in
+`/tmp/publisle-native-local/parity/`, including both PDFs, page and figure renders,
+differences and per-fixture reports. These are diagnostic artifacts, not release
+evidence for a later compiler image. The existing production image and its
+measurements below have not been replaced by this candidate.
+
+## Historical staged rollout measurement
+
 The generic article profile is ready for the staged hosted rollout. Journal
 profiles remain experimental pending complete visual fidelity review. Arabic
 remains on LuaLaTeX because geometry-based copying/extraction differs for some
