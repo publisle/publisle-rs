@@ -157,6 +157,8 @@ try {
         passed: comparison.passed,
         differences: comparison.differences.length,
         scores: comparison.scores,
+        figureScores: comparison.figureScores,
+        figuresPassed: comparison.figuresPassed,
       };
     } catch (error) {
       entry.error = error.stack ?? String(error);

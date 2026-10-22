@@ -50,13 +50,63 @@ export function textGeometry(xml) {
     if (word) word.text += text;
   };
   parser.onclosetag = (name) => {
-    if (name === "word") word = undefined;
+    if (name === "word") {
+      if (word) word.text = word.text.normalize("NFKC");
+      word = undefined;
+    }
     if (name === "line") line = undefined;
   };
   parser.write(xml).close();
   assert(pages.length, "PDF has no pages");
   return pages;
 }
+export function imageGeometry(xml) {
+  const parser = sax.parser(true);
+  const pages = [];
+  let page;
+  parser.onerror = (error) => {
+    throw error;
+  };
+  parser.onopentag = ({ name, attributes }) => {
+    if (name === "page") {
+      page = [];
+      pages.push(page);
+    }
+    if (name === "image") {
+      assert(page, "Image outside a page");
+      const box = ["left", "top", "width", "height"].map((key) =>
+        Number(attributes[key]),
+      );
+      assert(
+        box.every(Number.isFinite) && box[2] > 0 && box[3] > 0,
+        "Invalid image coordinates",
+      );
+      page.push(box);
+    }
+  };
+  parser.write(xml).close();
+  return pages;
+}
+export function withoutFigureText(pages, figures) {
+  return pages.map((page, p) => ({
+    ...page,
+    lines: page.lines
+      .map((line) =>
+        line.filter(
+          (word) =>
+            !(figures[p] ?? []).some(
+              ([x, y, w, h]) =>
+                word.box[0] >= x - 0.25 &&
+                word.box[1] >= y - 0.25 &&
+                word.box[2] <= x + w + 0.25 &&
+                word.box[3] <= y + h + 0.25,
+            ),
+        ),
+      )
+      .filter((line) => line.length),
+  }));
+}
+
 export function compareGeometry(reference, candidate, tolerance = 0.25) {
   const differences = [];
   if (reference.length !== candidate.length)
@@ -153,13 +203,28 @@ export async function comparePdf(reference, candidate, output) {
     );
   const a = await inspect(reference),
     b = await inspect(candidate);
-  const differences = compareGeometry(a, b, settings.maximumGeometryErrorPt);
+  const differences = [];
   const sharp = require("sharp");
   sharp.cache(false);
   sharp.concurrency(1);
   const stage = await mkdtemp(join(tmpdir(), "publisle-parity-"));
   const scores = [];
+  const figureScores = [];
+  let figures;
   try {
+    await execute(
+      "pdftohtml",
+      ["-xml", "-hidden", "-zoom", "1", reference, join(stage, "images")],
+      { timeout: 120000, maxBuffer: 65536 },
+    );
+    figures = imageGeometry(await readFile(join(stage, "images.xml"), "utf8"));
+    differences.push(
+      ...compareGeometry(
+        withoutFigureText(a, figures),
+        withoutFigureText(b, figures),
+        settings.maximumGeometryErrorPt,
+      ),
+    );
     for (let p = 1; p <= Math.min(a.length, b.length); p++) {
       const load = async (path, name) => {
         const prefix = join(stage, name);
@@ -197,6 +262,44 @@ export async function comparePdf(reference, candidate, output) {
         differences.push(
           `Page ${p}: SSIM ${score} below ${settings.minimumPageSsim}`,
         );
+      for (const [index, box] of (figures[p - 1] ?? []).entries()) {
+        const scale = settings.rasterDpi / 72;
+        const left = Math.max(0, Math.floor(box[0] * scale)),
+          top = Math.max(0, Math.floor(box[1] * scale));
+        const width = Math.min(x.info.width - left, Math.ceil(box[2] * scale)),
+          height = Math.min(x.info.height - top, Math.ceil(box[3] * scale));
+        if (width <= 0 || height <= 0) {
+          differences.push(
+            `Page ${p}: figure ${index + 1} is outside the page`,
+          );
+          continue;
+        }
+        const crop = (data) => {
+          const bytes = Buffer.alloc(width * height);
+          for (let row = 0; row < height; row++)
+            data.copy(
+              bytes,
+              row * width,
+              (top + row) * x.info.width + left,
+              (top + row) * x.info.width + left + width,
+            );
+          return bytes;
+        };
+        const first = crop(x.data),
+          second = crop(y.data);
+        const score = ssim(first, second, width, height);
+        figureScores.push({ page: p, figure: index + 1, box, ssim: score });
+        if (score < settings.minimumFigureSsim)
+          differences.push(
+            `Page ${p}, figure ${index + 1}: SSIM ${score} below ${settings.minimumFigureSsim}`,
+          );
+        await sharp(first, { raw: { width, height, channels: 1 } })
+          .png()
+          .toFile(join(output, `page-${p}-figure-${index + 1}-reference.png`));
+        await sharp(second, { raw: { width, height, channels: 1 } })
+          .png()
+          .toFile(join(output, `page-${p}-figure-${index + 1}-candidate.png`));
+      }
       // Preserve both pages and an absolute-difference image for visual review.
       await sharp(x.data, { raw: x.info })
         .png()
@@ -226,6 +329,10 @@ export async function comparePdf(reference, candidate, output) {
     referenceGeometry: a,
     candidateGeometry: b,
     scores,
+    figureScores,
+    figuresPassed: figureScores.every(
+      (figure) => figure.ssim >= settings.minimumFigureSsim,
+    ),
     differences,
   };
   await writeFile(
