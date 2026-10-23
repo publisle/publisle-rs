@@ -7,12 +7,20 @@ import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { compileJob } from "../deploy/vps/server.mjs";
-import { TEMPLATES, validateRequest } from "../deploy/vps/limits.mjs";
 import { comparePdf } from "./native-pdf-parity.mjs";
 const execute = promisify(execFile);
 const root = resolve(import.meta.dirname, "..");
 const referenceRoot = resolve(process.env.PUBLISLE_REFERENCE_SOURCE ?? "");
+assert(
+  process.env.PUBLISLE_REFERENCE_SOURCE,
+  "Set PUBLISLE_REFERENCE_SOURCE to the frozen TypeScript checkout",
+);
+const { compileJob } = await import(
+  pathToFileURL(join(referenceRoot, "deploy/vps/server.mjs"))
+);
+const { TEMPLATES, validateRequest } = await import(
+  pathToFileURL(join(referenceRoot, "deploy/vps/limits.mjs"))
+);
 const output = resolve(
   process.env.PDF_TEST_ARTIFACTS ?? ".local/native-parity",
 );
@@ -28,7 +36,7 @@ assert(
   "Use immutable worker image IDs",
 );
 const reference = JSON.parse(
-  await readFile(join(root, "native/pdf/reference.json"), "utf8"),
+  await readFile(join(root, "crates/publisle-pdf/reference.json"), "utf8"),
 );
 assert.equal(
   (

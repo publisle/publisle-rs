@@ -107,7 +107,7 @@ if (
   const directory = resolve(process.argv[2]);
   const matrix = JSON.parse(
     await readFile(
-      new URL("../native/pdf/READINESS.json", import.meta.url),
+      new URL("../crates/publisle-pdf/READINESS.json", import.meta.url),
       "utf8",
     ),
   );

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:divider",
+  "title": "Publisle beta divider",
+  "type": "object",
+  "properties": {},
+  "required": [],
+  "additionalProperties": false
+}

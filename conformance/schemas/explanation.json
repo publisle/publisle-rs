@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:explanation",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/inline"
+      }
+    },
+    "description": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    },
+    "instructions": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    },
+    "purpose": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    },
+    "fallback": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    },
+    "presets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "binding": {
+            "type": "string"
+          },
+          "description": {
+            "type": "array",
+            "items": {
+              "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+            }
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "maxItems": 4096
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

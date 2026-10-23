@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:document",
+  "title": "Publisle beta document",
+  "type": "object",
+  "properties": {
+    "dependencies": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "schemaVersion": { "type": "integer", "minimum": 1 },
+          "id": { "type": "string" },
+          "digest": { "type": "string" }
+        },
+        "required": ["type", "schemaVersion", "id", "digest"],
+        "additionalProperties": false
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": { "$ref": "urn:publisle:schema:json-value" }
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "metadata": {
+      "$ref": "urn:publisle:schema:metadata"
+    },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:block"
+      }
+    }
+  },
+  "required": ["schemaVersion", "blocks"],
+  "additionalProperties": false
+}

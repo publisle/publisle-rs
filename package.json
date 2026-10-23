@@ -1,0 +1,19 @@
+{
+  "name": "publisle-rs-tooling",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test tools/tests/*.test.mjs",
+    "conformance": "node tools/check-conformance.mjs"
+  },
+  "dependencies": {
+    "sax": "1.6.1",
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
+  }
+}

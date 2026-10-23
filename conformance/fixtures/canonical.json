@@ -1,0 +1,86 @@
+[
+  {
+    "id": "empty-object",
+    "text": "{}",
+    "canonical": "{}",
+    "digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "id": "null",
+    "text": "null",
+    "canonical": "null",
+    "digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+  },
+  {
+    "id": "negative-zero",
+    "text": "-0",
+    "canonical": "0",
+    "digest": "sha256:5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+  },
+  {
+    "id": "nested-order",
+    "text": " {\"z\":[3,{\"b\":true,\"a\":null}],\"a\":\"first\"} ",
+    "canonical": "{\"a\":\"first\",\"z\":[3,{\"a\":null,\"b\":true}]}",
+    "digest": "sha256:bbad75bdb9d7c6ca6b3708b4f754ba72c937c657170afbb9fe2fd1b7e8b98e57"
+  },
+  {
+    "id": "numeric-keys",
+    "text": "{\"2\":2,\"10\":10,\"1\":1}",
+    "canonical": "{\"1\":1,\"10\":10,\"2\":2}",
+    "digest": "sha256:c275fda38f0b687f7087b787ccd45762b4b2d2f423285407dd864feb1cf73635"
+  },
+  {
+    "id": "utf16-order",
+    "text": "{\"\\ue000\":\"private\",\"😀\":\"astral\",\"€\":\"euro\",\"a\":\"ascii\"}",
+    "canonical": "{\"a\":\"ascii\",\"€\":\"euro\",\"😀\":\"astral\",\"\":\"private\"}",
+    "digest": "sha256:c0df1e328129f5c14a8325e21d05f0e289512ca2a7274fd263221033fefcbe8e"
+  },
+  {
+    "id": "preserve-normalization",
+    "text": "{\"text\":\"e\\u0301\",\"other\":\"é\"}",
+    "canonical": "{\"other\":\"é\",\"text\":\"é\"}",
+    "digest": "sha256:27b5e1fdd8195231355bff1b91d570abbd289b710d2a23f405d770d3637c66a3"
+  },
+  {
+    "id": "primitive-array",
+    "text": "[true,false,null,\"x\",1]",
+    "canonical": "[true,false,null,\"x\",1]",
+    "digest": "sha256:226ae783c6354382a99c55dd4eee65f4cc2b0f04921ff3f58f6dbe4fdf114645"
+  },
+  {
+    "id": "numbers",
+    "text": "[333333333.33333329,1E30,4.50,2e-3,1e-27]",
+    "canonical": "[333333333.3333333,1e+30,4.5,0.002,1e-27]",
+    "digest": "sha256:7c6bc86d861387d823ae596b79ca0b26567dddc22a77acb1f4e06d441f555adf"
+  },
+  {
+    "id": "extreme-binary64",
+    "text": "[5e-324,1.7976931348623157e308,1e-6,1e-7,1e20,1e21]",
+    "canonical": "[5e-324,1.7976931348623157e+308,0.000001,1e-7,100000000000000000000,1e+21]",
+    "digest": "sha256:7e39347cdb6f1d9b308d3af26b36c72d9c33b0f06cd1f246fb760b01c7194a6b"
+  },
+  {
+    "id": "ordinary-rounding",
+    "text": "9007199254740993",
+    "canonical": "9007199254740992",
+    "digest": "sha256:c681da39d7273a6a24c15c9cac3a75526ff2ecf8ba4ee60346a0c70c8163bdb2"
+  },
+  {
+    "id": "exact-numeric-string",
+    "text": "{\"integer\":\"9007199254740993\",\"decimal\":\"0.123456789012345678901234\"}",
+    "canonical": "{\"decimal\":\"0.123456789012345678901234\",\"integer\":\"9007199254740993\"}",
+    "digest": "sha256:6fdd1868470783b873547f5ed53bff47ea34d244e0f28a05f9d1768d9a690614"
+  },
+  {
+    "id": "escaped-members",
+    "text": "{\"\\u0061\":\"line\\nslash\\\\quote\\\"\",\"__proto__\":{\"ok\":true}}",
+    "canonical": "{\"__proto__\":{\"ok\":true},\"a\":\"line\\nslash\\\\quote\\\"\"}",
+    "digest": "sha256:082d8cc828f68f653c193f7d741da218de08e7ce2aaf86ba56797eed0b6a0da7"
+  },
+  {
+    "id": "negative-and-exponent",
+    "text": "[-1.20e-3,1e+0,0e5]",
+    "canonical": "[-0.0012,1,0]",
+    "digest": "sha256:8c0280c960d2021e51f8dfec23baa5dc07f22618cff5ee16327c244e91225d66"
+  }
+]

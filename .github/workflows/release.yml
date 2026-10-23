@@ -1,0 +1,77 @@
+name: Release Rust crates and native npm packages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-release
+  cancel-in-progress: false
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+  crates:
+    needs: validate
+    if: github.repository == 'publisle/publisle-rs' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: rustup show active-toolchain
+      - uses: release-plz/action@v0.5
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+  npm:
+    needs: [validate, crates]
+    if: github.repository == 'publisle/publisle-rs' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm install --global npm@12.2.0
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: native-pdf-*
+          path: ${{ runner.temp }}/native-packages
+          merge-multiple: true
+      - name: Publish the exact five validated tarballs, then retain release evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --tags origin
+          node tools/publish-npm.mjs "$RUNNER_TEMP/native-packages"
+  release-pr:
+    needs: validate
+    if: github.repository == 'publisle/publisle-rs' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: rustup show active-toolchain
+      - uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

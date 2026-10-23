@@ -1,0 +1,1307 @@
+[
+  {
+    "id": "valid-paragraph",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "text",
+          "value": "Hello"
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "null-paragraph",
+    "schema": "paragraph",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-heading",
+    "schema": "heading",
+    "value": {
+      "level": 2,
+      "content": [
+        {
+          "type": "text",
+          "value": "Hello"
+        }
+      ],
+      "label": "heading:test"
+    },
+    "valid": true
+  },
+  {
+    "id": "null-heading",
+    "schema": "heading",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-list",
+    "schema": "list",
+    "value": {
+      "ordered": true,
+      "start": 2,
+      "items": [
+        {
+          "type": "listItem",
+          "children": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "value": "Hello"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "taskListItem",
+          "checked": false,
+          "children": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "value": "Hello"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "null-list",
+    "schema": "list",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-quote",
+    "schema": "quote",
+    "value": {
+      "children": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "null-quote",
+    "schema": "quote",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-code",
+    "schema": "code",
+    "value": {
+      "value": "const x = 1;",
+      "language": "js",
+      "meta": "example"
+    },
+    "valid": true
+  },
+  {
+    "id": "null-code",
+    "schema": "code",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-math",
+    "schema": "math",
+    "value": {
+      "value": "x^2",
+      "display": true,
+      "label": "eq:power"
+    },
+    "valid": true
+  },
+  {
+    "id": "null-math",
+    "schema": "math",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-figure",
+    "schema": "figure",
+    "value": {
+      "src": "./plot.svg",
+      "caption": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ],
+      "credit": [
+        {
+          "type": "text",
+          "value": "Hello"
+        }
+      ],
+      "original": {
+        "src": "./plot.csv",
+        "mediaType": "text/csv",
+        "filename": "plot.csv"
+      }
+    },
+    "valid": true
+  },
+  {
+    "id": "null-figure",
+    "schema": "figure",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-table",
+    "schema": "table",
+    "value": {
+      "align": ["left", null],
+      "rows": [
+        [
+          [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        ]
+      ],
+      "caption": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ],
+      "label": "table:values"
+    },
+    "valid": true
+  },
+  {
+    "id": "null-table",
+    "schema": "table",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-callout",
+    "schema": "callout",
+    "value": {
+      "variant": "note",
+      "title": "Note",
+      "children": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "null-callout",
+    "schema": "callout",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-divider",
+    "schema": "divider",
+    "value": {},
+    "valid": true
+  },
+  {
+    "id": "null-divider",
+    "schema": "divider",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-footnote",
+    "schema": "footnote",
+    "value": {
+      "identifier": "one",
+      "children": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "null-footnote",
+    "schema": "footnote",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-bibliography",
+    "schema": "bibliography",
+    "value": {
+      "entries": [
+        {
+          "id": "doe2026",
+          "type": "article-journal",
+          "title": "A note",
+          "authors": ["Doe, Jane"],
+          "issued": "2026",
+          "containerTitle": "Notes",
+          "volume": "1",
+          "issue": "2",
+          "page": "3-4",
+          "publisher": "Example Press",
+          "doi": "10.1000/note",
+          "url": "https://example.test/note",
+          "raw": "Doe, A note, 2026."
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "null-bibliography",
+    "schema": "bibliography",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-raw-html",
+    "schema": "raw-html",
+    "value": {
+      "value": "<em>trusted</em>",
+      "inline": false
+    },
+    "valid": true
+  },
+  {
+    "id": "null-raw-html",
+    "schema": "raw-html",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-embed",
+    "schema": "embed",
+    "value": {
+      "provider": "host:video",
+      "resourceId": "clip",
+      "title": "Video",
+      "aspectRatio": {
+        "width": 16,
+        "height": 9
+      },
+      "caption": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ],
+      "fallback": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "null-embed",
+    "schema": "embed",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-diagram",
+    "schema": "diagram",
+    "value": {
+      "engine": "mermaid",
+      "source": "flowchart LR\nA-->B",
+      "alt": "A to B",
+      "caption": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ],
+      "fallback": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ],
+      "printFallback": {
+        "src": "./diagram.svg"
+      }
+    },
+    "valid": true
+  },
+  {
+    "id": "null-diagram",
+    "schema": "diagram",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "valid-interactive-schematic",
+    "schema": "interactive-schematic",
+    "value": {
+      "activation": "visible",
+      "payload": {
+        "source": "./schematic.json"
+      },
+      "content": {
+        "title": [
+          {
+            "type": "text",
+            "value": "Hello"
+          }
+        ],
+        "description": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "value": "Hello"
+              }
+            ]
+          }
+        ],
+        "instructions": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "value": "Hello"
+              }
+            ]
+          }
+        ]
+      },
+      "fallback": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ],
+      "accessibility": {
+        "label": "Schematic"
+      }
+    },
+    "valid": true
+  },
+  {
+    "id": "null-interactive-schematic",
+    "schema": "interactive-schematic",
+    "value": null,
+    "valid": false
+  },
+  {
+    "id": "inline-text",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "text",
+          "value": "text"
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-emphasis",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "emphasis",
+          "children": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-strong",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "strong",
+          "children": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-strikethrough",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "strikethrough",
+          "children": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-inlineCode",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "inlineCode",
+          "value": "x"
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-inlineMath",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "inlineMath",
+          "value": "x^2"
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-link",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "link",
+          "url": "./page",
+          "title": "Page",
+          "children": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-inlineImage",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "inlineImage",
+          "url": "img.png",
+          "alt": "Image"
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-hardBreak",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "hardBreak"
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-softBreak",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "softBreak"
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-footnoteReference",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "footnoteReference",
+          "identifier": "one"
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-citationReference",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "citationReference",
+          "items": [
+            {
+              "id": "source",
+              "locator": "p. 1",
+              "suppressAuthor": false
+            }
+          ],
+          "prefix": "See",
+          "suffix": "."
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-crossReference",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "crossReference",
+          "target": "fig:one",
+          "children": [
+            {
+              "type": "text",
+              "value": "Hello"
+            }
+          ]
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "inline-rawHtml",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "rawHtml",
+          "value": "<b>x</b>"
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "nested-flow",
+    "schema": "quote",
+    "value": {
+      "children": [
+        {
+          "type": "quote",
+          "children": [
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                {
+                  "type": "taskListItem",
+                  "checked": true,
+                  "children": [
+                    {
+                      "type": "heading",
+                      "level": 3,
+                      "content": [
+                        {
+                          "type": "text",
+                          "value": "Hello"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "code",
+                      "value": "x"
+                    },
+                    {
+                      "type": "divider"
+                    },
+                    {
+                      "type": "rawHtml",
+                      "value": "<i>x</i>"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "invalid-known-payload-not-opaque",
+    "schema": "document",
+    "value": {
+      "schemaVersion": 1,
+      "blocks": [
+        {
+          "id": "00000000-0000-4000-a000-000000000001",
+          "type": "publisle:heading",
+          "schemaVersion": 1,
+          "data": {
+            "level": 9,
+            "content": [
+              {
+                "type": "text",
+                "value": "Hello"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "valid": false
+  },
+  {
+    "id": "unknown-array",
+    "schema": "document",
+    "value": {
+      "schemaVersion": 1,
+      "blocks": [
+        {
+          "id": "00000000-0000-4000-a000-000000000001",
+          "type": "host:unfamiliar",
+          "schemaVersion": 7,
+          "data": [
+            1,
+            {
+              "meaning": "unresolved"
+            }
+          ]
+        }
+      ]
+    },
+    "valid": true
+  },
+  {
+    "id": "unknown-null",
+    "schema": "block",
+    "value": {
+      "id": "00000000-0000-4000-a000-000000000001",
+      "type": "host:unfamiliar",
+      "schemaVersion": 3,
+      "data": null
+    },
+    "valid": true
+  },
+  {
+    "id": "known-wrong-version",
+    "schema": "block",
+    "value": {
+      "id": "00000000-0000-4000-a000-000000000001",
+      "type": "publisle:paragraph",
+      "schemaVersion": 2,
+      "data": {
+        "content": [
+          {
+            "type": "text",
+            "value": "Hello"
+          }
+        ]
+      }
+    },
+    "valid": false
+  },
+  {
+    "id": "missing-null-distinction",
+    "schema": "figure",
+    "value": {
+      "src": "x.svg",
+      "alt": null
+    },
+    "valid": false
+  },
+  {
+    "id": "decorative-alt",
+    "schema": "figure",
+    "value": {
+      "src": "x.svg",
+      "alt": ""
+    },
+    "valid": true
+  },
+  {
+    "id": "invalid-heading",
+    "schema": "heading",
+    "value": {
+      "level": "2",
+      "content": [
+        {
+          "type": "text",
+          "value": "Hello"
+        }
+      ]
+    },
+    "valid": false
+  },
+  {
+    "id": "unmodeled-data",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "text",
+          "value": "Hello"
+        }
+      ],
+      "extra": true
+    },
+    "valid": false
+  },
+  {
+    "id": "invalid-inline",
+    "schema": "paragraph",
+    "value": {
+      "content": [
+        {
+          "type": "invented",
+          "value": "x"
+        }
+      ]
+    },
+    "valid": false
+  },
+  {
+    "id": "invalid-list-item",
+    "schema": "list",
+    "value": {
+      "ordered": false,
+      "items": [
+        {
+          "type": "taskListItem",
+          "children": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "value": "Hello"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "valid": false
+  },
+  {
+    "id": "metadata",
+    "schema": "metadata",
+    "value": {
+      "title": "Title",
+      "language": "en",
+      "authors": [
+        {
+          "name": "Author",
+          "identifiers": {
+            "orcid": "x"
+          }
+        }
+      ],
+      "publishedAt": "2026-10-08T10:00:00.123456+03:00",
+      "license": {
+        "identifier": "MIT"
+      },
+      "image": {
+        "src": "cover.svg",
+        "alt": "Cover"
+      },
+      "extensions": {
+        "host:note": null
+      }
+    },
+    "valid": true
+  },
+  {
+    "id": "timestamp-missing-zone",
+    "schema": "metadata",
+    "value": {
+      "publishedAt": "2026-10-08T10:00:00"
+    },
+    "valid": false
+  },
+  {
+    "id": "non-namespaced",
+    "schema": "block-envelope",
+    "value": {
+      "id": "00000000-0000-4000-a000-000000000001",
+      "type": "paragraph",
+      "schemaVersion": 1,
+      "data": null
+    },
+    "valid": false
+  },
+  {
+    "id": "canonical-document",
+    "schema": "document",
+    "value": {
+      "schemaVersion": 1,
+      "metadata": {
+        "title": "Complete"
+      },
+      "blocks": [
+        {
+          "id": "00000000-0000-4000-a000-000000000001",
+          "type": "publisle:paragraph",
+          "schemaVersion": 1,
+          "data": {
+            "content": [
+              {
+                "type": "text",
+                "value": "Hello"
+              }
+            ]
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000002",
+          "type": "publisle:heading",
+          "schemaVersion": 1,
+          "data": {
+            "level": 2,
+            "content": [
+              {
+                "type": "text",
+                "value": "Hello"
+              }
+            ],
+            "label": "heading:test"
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000003",
+          "type": "publisle:list",
+          "schemaVersion": 1,
+          "data": {
+            "ordered": true,
+            "start": 2,
+            "items": [
+              {
+                "type": "listItem",
+                "children": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "value": "Hello"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "taskListItem",
+                "checked": false,
+                "children": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "value": "Hello"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000004",
+          "type": "publisle:quote",
+          "schemaVersion": 1,
+          "data": {
+            "children": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Hello"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000005",
+          "type": "publisle:code",
+          "schemaVersion": 1,
+          "data": {
+            "value": "const x = 1;",
+            "language": "js",
+            "meta": "example"
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000006",
+          "type": "publisle:math",
+          "schemaVersion": 1,
+          "data": {
+            "value": "x^2",
+            "display": true,
+            "label": "eq:power"
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000007",
+          "type": "publisle:figure",
+          "schemaVersion": 1,
+          "data": {
+            "src": "./plot.svg",
+            "caption": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Hello"
+                  }
+                ]
+              }
+            ],
+            "credit": [
+              {
+                "type": "text",
+                "value": "Hello"
+              }
+            ],
+            "original": {
+              "src": "./plot.csv",
+              "mediaType": "text/csv",
+              "filename": "plot.csv"
+            }
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000008",
+          "type": "publisle:table",
+          "schemaVersion": 1,
+          "data": {
+            "align": ["left", null],
+            "rows": [
+              [
+                [
+                  {
+                    "type": "text",
+                    "value": "Hello"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "value": "Hello"
+                  }
+                ]
+              ]
+            ],
+            "caption": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Hello"
+                  }
+                ]
+              }
+            ],
+            "label": "table:values"
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000009",
+          "type": "publisle:callout",
+          "schemaVersion": 1,
+          "data": {
+            "variant": "note",
+            "title": "Note",
+            "children": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Hello"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000010",
+          "type": "publisle:divider",
+          "schemaVersion": 1,
+          "data": {}
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000011",
+          "type": "publisle:footnote",
+          "schemaVersion": 1,
+          "data": {
+            "identifier": "one",
+            "children": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Hello"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000012",
+          "type": "publisle:raw-html",
+          "schemaVersion": 1,
+          "data": {
+            "value": "<em>trusted</em>",
+            "inline": false
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000013",
+          "type": "publisle:embed",
+          "schemaVersion": 1,
+          "data": {
+            "provider": "host:video",
+            "resourceId": "clip",
+            "title": "Video",
+            "aspectRatio": {
+              "width": 16,
+              "height": 9
+            },
+            "caption": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Hello"
+                  }
+                ]
+              }
+            ],
+            "fallback": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Hello"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000014",
+          "type": "publisle:diagram",
+          "schemaVersion": 1,
+          "data": {
+            "engine": "mermaid",
+            "source": "flowchart LR\nA-->B",
+            "alt": "A to B",
+            "caption": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Hello"
+                  }
+                ]
+              }
+            ],
+            "fallback": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Hello"
+                  }
+                ]
+              }
+            ],
+            "printFallback": {
+              "src": "./diagram.svg"
+            }
+          }
+        },
+        {
+          "id": "00000000-0000-4000-a000-000000000015",
+          "type": "publisle:interactive-schematic",
+          "schemaVersion": 2,
+          "data": {
+            "activation": "visible",
+            "payload": {
+              "source": "./schematic.json"
+            },
+            "content": {
+              "title": [
+                {
+                  "type": "text",
+                  "value": "Hello"
+                }
+              ],
+              "description": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "value": "Hello"
+                    }
+                  ]
+                }
+              ],
+              "instructions": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "value": "Hello"
+                    }
+                  ]
+                }
+              ]
+            },
+            "fallback": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Hello"
+                  }
+                ]
+              }
+            ],
+            "accessibility": {
+              "label": "Schematic"
+            }
+          }
+        }
+      ]
+    },
+    "valid": true
+  }
+]

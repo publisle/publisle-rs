@@ -7,10 +7,10 @@ No TeX installation is needed at runtime. LaTeX source/submission export keeps
 using the existing research source generators.
 
 ```sh
-cargo build --release --locked --manifest-path native/pdf/Cargo.toml
-PUBLISLE_TEST_FONT_DIR=/usr/share/fonts/truetype/dejavu cargo test --locked --manifest-path native/pdf/Cargo.toml
-cargo clippy --locked --manifest-path native/pdf/Cargo.toml --all-targets -- -D warnings
-native/pdf/target/release/publisle-pdf INPUT.json NEW-OUTPUT.pdf
+cargo build --release --locked --manifest-path crates/publisle-pdf/Cargo.toml
+PUBLISLE_TEST_FONT_DIR=/usr/share/fonts/truetype/dejavu cargo test --locked --manifest-path crates/publisle-pdf/Cargo.toml
+cargo clippy --locked --manifest-path crates/publisle-pdf/Cargo.toml --all-targets -- -D warnings
+target/release/publisle-pdf INPUT.json NEW-OUTPUT.pdf
 ```
 
 The versioned input is defined in `src/model.rs` and lowered by

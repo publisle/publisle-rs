@@ -1,0 +1,118 @@
+{
+  "format": "publisle:block-migrations",
+  "formatVersion": 1,
+  "comment": "Shared fixtures for the portable built-in block migrations. The TypeScript implementation (packages/block-sdk migrateInteractiveEnvelope) and the independent Python port (tools/python/migrations.py) must produce identical output for every case. Executable or host-supplied migrations are implementation-bound by design and are refused, never guessed.",
+  "cases": [
+    {
+      "name": "legacy alt becomes the accessibility label",
+      "type": "publisle:interactive-schematic",
+      "from": 1,
+      "to": 2,
+      "input": {
+        "activation": "interaction",
+        "alt": "Clocked counter",
+        "payload": {
+          "source": "./counter.json"
+        }
+      },
+      "expected": {
+        "activation": "interaction",
+        "payload": {
+          "source": "./counter.json"
+        },
+        "accessibility": {
+          "label": "Clocked counter"
+        }
+      }
+    },
+    {
+      "name": "existing accessibility keys are preserved",
+      "type": "publisle:interactive-schematic",
+      "from": 1,
+      "to": 2,
+      "input": {
+        "activation": "visible",
+        "alt": "Legacy description",
+        "accessibility": {
+          "label": "Authored label",
+          "role": "region"
+        },
+        "payload": {
+          "source": "./a.json"
+        }
+      },
+      "expected": {
+        "activation": "visible",
+        "accessibility": {
+          "label": "Authored label",
+          "role": "region"
+        },
+        "payload": {
+          "source": "./a.json"
+        }
+      }
+    },
+    {
+      "name": "a missing alt leaves the envelope unchanged",
+      "type": "publisle:interactive-schematic",
+      "from": 1,
+      "to": 2,
+      "input": {
+        "activation": "idle",
+        "accessibility": {
+          "label": "Kept"
+        },
+        "payload": {}
+      },
+      "expected": {
+        "activation": "idle",
+        "accessibility": {
+          "label": "Kept"
+        },
+        "payload": {}
+      }
+    },
+    {
+      "name": "a non-string alt is not migrated",
+      "type": "publisle:interactive-schematic",
+      "from": 1,
+      "to": 2,
+      "input": {
+        "activation": "load",
+        "alt": 7,
+        "payload": {}
+      },
+      "expected": {
+        "activation": "load",
+        "payload": {}
+      }
+    },
+    {
+      "name": "non-object payloads pass through untouched",
+      "type": "publisle:interactive-schematic",
+      "from": 1,
+      "to": 2,
+      "input": [],
+      "expected": []
+    },
+    {
+      "name": "explicit null accessibility keys are preserved",
+      "type": "publisle:interactive-schematic",
+      "from": 1,
+      "to": 2,
+      "input": {
+        "alt": "Legacy",
+        "accessibility": {
+          "label": null,
+          "role": null
+        }
+      },
+      "expected": {
+        "accessibility": {
+          "label": null,
+          "role": null
+        }
+      }
+    }
+  ]
+}

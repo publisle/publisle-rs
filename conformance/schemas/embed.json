@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:embed",
+  "title": "Publisle beta embed",
+  "type": "object",
+  "properties": {
+    "provider": {
+      "type": "string",
+      "pattern": "[^\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]"
+    },
+    "resourceId": {
+      "type": "string",
+      "pattern": "[^\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]"
+    },
+    "title": {
+      "type": "string",
+      "pattern": "[^\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]"
+    },
+    "aspectRatio": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": ["width", "height"],
+      "additionalProperties": false
+    },
+    "caption": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    },
+    "fallback": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    }
+  },
+  "required": ["provider", "resourceId", "title", "aspectRatio"],
+  "additionalProperties": false
+}

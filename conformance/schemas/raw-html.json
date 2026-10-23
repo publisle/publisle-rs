@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:raw-html",
+  "title": "Publisle beta raw-html",
+  "type": "object",
+  "properties": {
+    "value": {
+      "type": "string"
+    },
+    "inline": {
+      "type": "boolean"
+    }
+  },
+  "required": ["value", "inline"],
+  "additionalProperties": false
+}

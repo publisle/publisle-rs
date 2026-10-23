@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:traversal",
+  "type": "object",
+  "properties": {
+    "root": {
+      "$ref": "#/$defs/rule"
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/rule"
+      },
+      "maxProperties": 4096
+    }
+  },
+  "required": ["root"],
+  "additionalProperties": false,
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "properties": {
+        "optional": {
+          "type": "boolean"
+        },
+        "emit": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": ["node", "reference", "resource"]
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "additionalProperties": false
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/rule"
+          },
+          "maxProperties": 4096
+        },
+        "items": {
+          "$ref": "#/$defs/rule"
+        },
+        "tag": {
+          "type": "object",
+          "properties": {
+            "property": {
+              "type": "string"
+            },
+            "cases": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/rule"
+              },
+              "maxProperties": 4096
+            }
+          },
+          "required": ["property", "cases"],
+          "additionalProperties": false
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  }
+}

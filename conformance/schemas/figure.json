@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:figure",
+  "title": "Publisle beta figure",
+  "type": "object",
+  "properties": {
+    "src": {
+      "type": "string"
+    },
+    "alt": {
+      "type": "string"
+    },
+    "variants": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "title": {
+      "type": "string"
+    },
+    "label": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+    },
+    "caption": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    },
+    "credit": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/inline"
+      }
+    },
+    "original": {
+      "type": "object",
+      "properties": {
+        "src": {
+          "type": "string"
+        },
+        "mediaType": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string"
+        }
+      },
+      "required": ["src"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["src"],
+  "additionalProperties": false
+}

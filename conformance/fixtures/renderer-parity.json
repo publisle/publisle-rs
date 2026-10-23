@@ -1,0 +1,144 @@
+{
+  "format": "publisle:renderer-parity",
+  "formatVersion": 1,
+  "capabilities": {
+    "role": "static-renderer",
+    "schemaVersion": 1,
+    "fullCSL": false,
+    "plugins": false,
+    "migrations": "builtin-portable"
+  },
+  "cases": [
+    {
+      "name": "legacy schematic migrates before rendering",
+      "document": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "publisle:interactive-schematic",
+            "schemaVersion": 1,
+            "data": {
+              "activation": "interaction",
+              "payload": {
+                "source": "./counter.json"
+              },
+              "alt": "Legacy counter",
+              "fallback": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "value": "Counter fallback"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "classification": "rendered",
+        "codes": [],
+        "paragraphs": ["Counter fallback"]
+      }
+    },
+    {
+      "name": "current schematic renders authored fallback",
+      "document": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "publisle:interactive-schematic",
+            "schemaVersion": 2,
+            "data": {
+              "activation": "interaction",
+              "payload": {
+                "source": "./counter.json"
+              },
+              "fallback": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "value": "Current fallback"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected": {
+        "classification": "rendered",
+        "codes": [],
+        "paragraphs": ["Current fallback"]
+      }
+    },
+    {
+      "name": "bare schematic reports missing representation",
+      "document": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "publisle:interactive-schematic",
+            "schemaVersion": 2,
+            "data": {
+              "activation": "interaction",
+              "payload": {
+                "source": "./counter.json"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "classification": "fallback-with-diagnostic",
+        "codes": ["missing-static-representation"],
+        "paragraphs": []
+      }
+    },
+    {
+      "name": "future schematic version is rejected",
+      "document": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "type": "publisle:interactive-schematic",
+            "schemaVersion": 3,
+            "data": {
+              "activation": "interaction",
+              "payload": {
+                "source": "./counter.json"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "classification": "rejected",
+        "codes": ["unsupported-block-version"],
+        "paragraphs": []
+      }
+    },
+    {
+      "name": "future document envelope is rejected without host migration",
+      "document": {
+        "schemaVersion": 2,
+        "blocks": []
+      },
+      "expected": {
+        "classification": "rejected",
+        "codes": ["unsupported-document-version"],
+        "paragraphs": []
+      }
+    }
+  ]
+}

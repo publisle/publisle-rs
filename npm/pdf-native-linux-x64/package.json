@@ -1,6 +1,6 @@
 {
   "name": "@publisle/pdf-native-linux-x64",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "Pinned Publisle native PDF compiler and fonts for linux/x64",
   "license": "MIT",
@@ -29,5 +29,10 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/publisle/publisle-rs.git",
+    "directory": "npm/pdf-native-linux-x64"
   }
 }

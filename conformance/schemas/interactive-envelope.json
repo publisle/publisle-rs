@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:interactive-envelope",
+  "title": "Publisle beta interactive-envelope",
+  "type": "object",
+  "properties": {
+    "initialState": { "$ref": "urn:publisle:schema:json-value" },
+    "activation": {
+      "enum": ["load", "visible", "idle", "interaction"]
+    },
+    "payload": {
+      "$ref": "urn:publisle:schema:json-value"
+    },
+    "content": {
+      "$ref": "urn:publisle:schema:explanation"
+    },
+    "fallback": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    },
+    "accessibility": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": ["activation", "payload"],
+  "additionalProperties": false
+}

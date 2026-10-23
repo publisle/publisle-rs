@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:callout",
+  "title": "Publisle beta callout",
+  "type": "object",
+  "properties": {
+    "variant": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "children": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    }
+  },
+  "required": ["variant", "children"],
+  "additionalProperties": false
+}

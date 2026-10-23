@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:interactive-schematic",
+  "title": "Publisle beta interactive-schematic",
+  "allOf": [
+    {
+      "$ref": "urn:publisle:schema:interactive-envelope"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "payload": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string"
+            }
+          },
+          "required": ["source"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

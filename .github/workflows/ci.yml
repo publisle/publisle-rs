@@ -1,0 +1,125 @@
+name: Rust and native package CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - run: rustup show active-toolchain
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: sudo apt-get update && sudo apt-get install -y fonts-dejavu-core
+      - run: cargo test --workspace --locked
+        env:
+          PUBLISLE_TEST_FONT_DIR: /usr/share/fonts/truetype/dejavu
+      - run: node tools/check-conformance.mjs --upstream
+      - run: node --test tools/tests/*.test.mjs
+  fonts:
+    needs: check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Build the same pinned font bundle as the hosted worker
+        run: |
+          docker build --target fonts -f deploy/vps/native-worker.Dockerfile -t native-pdf-fonts .
+          CID=$(docker create native-pdf-fonts)
+          mkdir -p "$RUNNER_TEMP/native-fonts"
+          docker cp "$CID:/fonts" "$RUNNER_TEMP/native-fonts/fonts"
+          docker rm "$CID"
+          node --input-type=module <<'JS'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          const fonts=JSON.parse(readFileSync('deploy/vps/native-fonts.json'));
+          for(const font of fonts) font.path=font.path.replace('/app/','');
+          writeFileSync(`${process.env.RUNNER_TEMP}/native-fonts/fonts.json`,JSON.stringify(fonts));
+          JS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: native-pdf-fonts
+          path: ${{ runner.temp }}/native-fonts
+
+  binary:
+    needs: fonts
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux
+            architecture: x64
+          - runner: ubuntu-24.04-arm
+            platform: linux
+            architecture: arm64
+          - runner: macos-15-intel
+            platform: darwin
+            architecture: x64
+          - runner: macos-15
+            platform: darwin
+            architecture: arm64
+          - runner: windows-2025
+            platform: win32
+            architecture: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-pdf-fonts
+          path: ${{ runner.temp }}/native-fonts
+      - name: Build Linux binaries against Debian bookworm glibc
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          docker build --target compiler -f deploy/vps/native-worker.Dockerfile -t native-pdf-compiler .
+          CID=$(docker create native-pdf-compiler)
+          docker cp "$CID:/publisle-pdf" "$RUNNER_TEMP/publisle-pdf"
+          docker rm "$CID"
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: native-release-${{ runner.os }}-${{ matrix.architecture }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: native-release-${{ runner.os }}-${{ matrix.architecture }}-
+      - name: Build macOS and Windows binaries with the pinned toolchain
+        if: matrix.platform != 'linux'
+        shell: bash
+        env:
+          RUSTFLAGS: ${{ matrix.platform == 'win32' && '-C target-feature=+crt-static' || '' }}
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal
+          cargo +1.90.0 build --release --locked -p publisle-pdf
+          EXT=""
+          if [ "${{ matrix.platform }}" = win32 ]; then EXT=.exe; fi
+          cp "target/release/publisle-pdf$EXT" "$RUNNER_TEMP/publisle-pdf$EXT"
+      - name: Stage npm package and prove offline runtime independence
+        shell: bash
+        run: |
+          EXT=""
+          if [ "${{ matrix.platform }}" = win32 ]; then EXT=.exe; fi
+          node tools/package-native-pdf.mjs "$RUNNER_TEMP/publisle-pdf$EXT" "$RUNNER_TEMP/native-fonts/fonts.json" "$RUNNER_TEMP/native-fonts/fonts/licenses" "${{ matrix.platform }}" "${{ matrix.architecture }}" "$RUNNER_TEMP/package"
+          node tools/native-package-smoke.mjs "$RUNNER_TEMP/package"
+          cd "$RUNNER_TEMP/package"
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: native-pdf-${{ matrix.platform }}-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/publisle-pdf-native-*.tgz

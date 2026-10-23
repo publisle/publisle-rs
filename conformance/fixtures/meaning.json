@@ -1,0 +1,526 @@
+{
+  "example": {
+    "data": {
+      "payload": {
+        "frequency": 2,
+        "amplitude": 1,
+        "spectrum": [0, 1, 0],
+        "plot": {
+          "series": "spectrum"
+        },
+        "reset": {
+          "frequency": 2,
+          "amplitude": 1
+        }
+      },
+      "content": {
+        "title": [
+          {
+            "type": "text",
+            "value": "Unfamiliar wave explorer"
+          }
+        ],
+        "purpose": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "value": "Compare a wave with its declared spectrum."
+              }
+            ]
+          }
+        ],
+        "observations": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "value": "The output shown here was supplied by the renderer; it is not independently verified."
+              }
+            ]
+          }
+        ],
+        "presets": [
+          {
+            "id": "initial",
+            "binding": "/payload/reset",
+            "description": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Restore the authored starting values."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "structure": {
+      "type": "object",
+      "properties": {
+        "payload": {
+          "type": "object",
+          "properties": {
+            "frequency": {
+              "type": "number"
+            },
+            "amplitude": {
+              "type": "number"
+            },
+            "spectrum": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "plot": {
+              "type": "object",
+              "properties": {
+                "series": {
+                  "type": "string"
+                }
+              }
+            },
+            "reset": {
+              "type": "object",
+              "properties": {
+                "frequency": {
+                  "type": "number"
+                },
+                "amplitude": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "required": ["frequency", "amplitude", "spectrum", "plot", "reset"],
+          "additionalProperties": false
+        },
+        "content": {
+          "$ref": "urn:publisle:schema:explanation"
+        }
+      },
+      "required": ["payload"],
+      "additionalProperties": false
+    },
+    "semantics": {
+      "entities": [
+        {
+          "id": "wave",
+          "kind": "concept",
+          "name": "Wave",
+          "origin": "authored",
+          "description": "A periodic signal; no particular rendering engine is required to read this declaration."
+        },
+        {
+          "id": "frequency",
+          "kind": "input",
+          "name": "Frequency",
+          "origin": "declared-rule",
+          "binding": "/payload/frequency",
+          "valueType": "number",
+          "unit": "Hz",
+          "dimension": "time^-1",
+          "domain": {
+            "minimum": 0,
+            "maximum": 20
+          },
+          "default": 2,
+          "effects": ["spectrum", "plot"]
+        },
+        {
+          "id": "amplitude",
+          "kind": "input",
+          "name": "Amplitude",
+          "origin": "declared-rule",
+          "binding": "/payload/amplitude",
+          "valueType": "number",
+          "domain": {
+            "minimum": 0
+          },
+          "default": 1,
+          "effects": ["spectrum"]
+        },
+        {
+          "id": "spectrum",
+          "kind": "output",
+          "name": "Spectrum",
+          "origin": "calculated-result",
+          "binding": "/payload/spectrum",
+          "valueType": "array",
+          "references": ["frequency", "amplitude", "evidence"],
+          "interpretation": "Supplied spectral samples; scientific correctness is not inferred.",
+          "implementation": {
+            "status": "implementation-bound",
+            "identity": "host:wave-engine",
+            "limitation": "Computing these samples requires the host's implementation."
+          }
+        },
+        {
+          "id": "reset",
+          "kind": "action",
+          "name": "Reset",
+          "origin": "authored",
+          "inputs": ["frequency", "amplitude"],
+          "results": ["state"],
+          "implementation": {
+            "status": "implementation-bound",
+            "identity": "host:reset",
+            "limitation": "The host executes reset; this declaration describes its effect only."
+          }
+        },
+        {
+          "id": "state",
+          "kind": "state",
+          "name": "Initial parameters",
+          "origin": "authored",
+          "binding": "/payload/reset",
+          "initial": {
+            "frequency": 2,
+            "amplitude": 1
+          },
+          "reset": "reset",
+          "transient": false
+        },
+        {
+          "id": "plot",
+          "kind": "view",
+          "name": "Spectrum plot",
+          "origin": "authored",
+          "binding": "/payload/plot",
+          "role": "plot",
+          "references": ["spectrum"]
+        },
+        {
+          "id": "assumption",
+          "kind": "assumption",
+          "name": "Periodic signal",
+          "origin": "authored",
+          "description": "The illustrative signal is assumed periodic."
+        },
+        {
+          "id": "evidence",
+          "kind": "evidence",
+          "name": "Host-generated sample",
+          "origin": "authored",
+          "source": "host:wave-engine",
+          "description": "No verified computation certificate accompanies these values."
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "bound-input",
+      "valid": true,
+      "data": {
+        "x": 3
+      },
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "input",
+            "name": "X",
+            "origin": "authored",
+            "binding": "/x"
+          }
+        ]
+      }
+    },
+    {
+      "id": "escaped-pointer",
+      "valid": true,
+      "data": {
+        "a/b": {
+          "~x": null
+        }
+      },
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "input",
+            "name": "X",
+            "origin": "authored",
+            "binding": "/a~1b/~0x"
+          }
+        ]
+      }
+    },
+    {
+      "id": "opaque-action",
+      "valid": true,
+      "data": null,
+      "semantics": {
+        "entities": [
+          {
+            "id": "run",
+            "kind": "action",
+            "name": "Run",
+            "origin": "authored",
+            "implementation": {
+              "status": "implementation-bound",
+              "limitation": "Host code is needed."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "duplicate-id",
+      "valid": false,
+      "code": "duplicate-semantic-id",
+      "data": {
+        "x": 1
+      },
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "input",
+            "name": "X",
+            "origin": "authored",
+            "binding": "/x"
+          },
+          {
+            "id": "x",
+            "kind": "input",
+            "name": "X",
+            "origin": "authored",
+            "binding": "/x"
+          }
+        ]
+      }
+    },
+    {
+      "id": "missing-binding",
+      "valid": false,
+      "code": "unresolved-semantic-binding",
+      "data": {},
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "input",
+            "name": "X",
+            "origin": "authored",
+            "binding": "/x"
+          }
+        ]
+      }
+    },
+    {
+      "id": "undeclared-binding",
+      "valid": false,
+      "code": "unresolved-semantic-binding",
+      "data": {},
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "input",
+            "name": "X",
+            "origin": "authored"
+          }
+        ]
+      }
+    },
+    {
+      "id": "wildcard-pointer",
+      "valid": false,
+      "code": "unresolved-semantic-binding",
+      "data": {
+        "x": [1]
+      },
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "input",
+            "name": "X",
+            "origin": "authored",
+            "binding": "/x/*"
+          }
+        ]
+      }
+    },
+    {
+      "id": "malformed-pointer",
+      "valid": false,
+      "code": "unresolved-semantic-binding",
+      "data": {
+        "x": 1
+      },
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "input",
+            "name": "X",
+            "origin": "authored",
+            "binding": "/x~2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "noncanonical-index",
+      "valid": false,
+      "code": "unresolved-semantic-binding",
+      "data": {
+        "x": [1]
+      },
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "input",
+            "name": "X",
+            "origin": "authored",
+            "binding": "/x/00"
+          }
+        ]
+      }
+    },
+    {
+      "id": "dangling-reference",
+      "valid": false,
+      "code": "unresolved-semantic-reference",
+      "data": {
+        "x": 1
+      },
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "input",
+            "name": "X",
+            "origin": "authored",
+            "binding": "/x",
+            "references": ["missing"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "unsupported-kind",
+      "valid": false,
+      "code": "invalid-semantics",
+      "data": null,
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "unknown-behavior",
+            "name": "X",
+            "origin": "authored"
+          }
+        ]
+      }
+    },
+    {
+      "id": "unmarked-calculation",
+      "valid": false,
+      "code": "invalid-semantics",
+      "data": {
+        "x": 1
+      },
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "output",
+            "name": "X",
+            "binding": "/x"
+          }
+        ]
+      }
+    },
+    {
+      "id": "opaque-view-limit",
+      "valid": true,
+      "data": null,
+      "semantics": {
+        "entities": [
+          {
+            "id": "canvas",
+            "kind": "view",
+            "name": "3D canvas",
+            "origin": "authored",
+            "role": "scene",
+            "implementation": {
+              "status": "implementation-bound",
+              "limitation": "Geometry and GPU state cannot be reproduced from a prose declaration."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "opaque-view-without-limit",
+      "valid": false,
+      "code": "invalid-semantics",
+      "data": null,
+      "semantics": {
+        "entities": [
+          {
+            "id": "canvas",
+            "kind": "view",
+            "name": "3D canvas",
+            "origin": "authored",
+            "implementation": {
+              "status": "implementation-bound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "reset-not-action",
+      "valid": false,
+      "code": "invalid-semantics",
+      "data": {
+        "x": 1
+      },
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "input",
+            "name": "X",
+            "origin": "authored",
+            "binding": "/x",
+            "reset": "x"
+          }
+        ]
+      }
+    },
+    {
+      "id": "unknown-field",
+      "valid": false,
+      "code": "invalid-semantics",
+      "data": {
+        "x": 1
+      },
+      "semantics": {
+        "entities": [
+          {
+            "id": "x",
+            "kind": "input",
+            "name": "X",
+            "origin": "authored",
+            "binding": "/x",
+            "execute": "javascript"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "count": { "type": "integer", "minimum": 0 },
+      "label": { "type": "string" }
+    },
+    "required": ["count"],
+    "additionalProperties": false
+  },
+  "documentation": {
+    "name": "Portable counter data",
+    "purpose": "An authored nonnegative count, not a promise of executable counter behavior.",
+    "properties": {
+      "count": "Authored nonnegative integer count.",
+      "label": "Optional authored label."
+    },
+    "validExamples": [{ "input": { "count": 3 }, "output": { "count": 3 } }],
+    "invalidExamples": [
+      { "input": { "count": -1 }, "diagnostic": "invalid-data" }
+    ]
+  },
+  "behavior": {
+    "limitations": [
+      "No increment action or executable state behavior is defined."
+    ],
+    "executable": {}
+  },
+  "projections": {
+    "reading": "Authored count and optional label; no inferred interactive behavior.",
+    "semantic": "No scientific or behavioral semantics are declared."
+  },
+  "compatibility": {
+    "schemaProfile": "urn:publisle:schema-profile:beta",
+    "semanticProfile": "urn:publisle:meaning:beta",
+    "runtimeABI": "publisle-island:beta"
+  },
+  "provenance": { "publisher": "Publisle contributors", "license": "MIT" }
+}

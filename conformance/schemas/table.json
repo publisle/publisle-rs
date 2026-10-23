@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:table",
+  "title": "Publisle beta table",
+  "type": "object",
+  "properties": {
+    "align": {
+      "type": "array",
+      "items": {
+        "enum": ["left", "right", "center", null]
+      }
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:publisle:schema:rich-content#/$defs/inline"
+          }
+        }
+      }
+    },
+    "label": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+    },
+    "caption": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    },
+    "headerRows": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": ["align", "rows"],
+  "additionalProperties": false
+}

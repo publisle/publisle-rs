@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:block-envelope",
+  "title": "Publisle beta block-envelope",
+  "type": "object",
+  "properties": {
+    "readable": { "$ref": "urn:publisle:schema:readable" },
+    "id": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26})$(?![\\s\\S])"
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^[^\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF:]+:[^\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]+$(?![\\s\\S])"
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "data": {
+      "$ref": "urn:publisle:schema:json-value"
+    }
+  },
+  "required": ["id", "type", "schemaVersion", "data"],
+  "additionalProperties": false
+}

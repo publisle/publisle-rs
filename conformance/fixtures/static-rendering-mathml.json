@@ -1,0 +1,27 @@
+{
+  "format": "publisle:static-rendering-mathml",
+  "formatVersion": 1,
+  "comment": "Shared presentation-MathML expectations for the static rendering corpus. Both independent renderers must produce exactly these trees after dropping semantics/annotation wrappers and collapsing inter-tag whitespace. The trees were reviewed against the KaTeX MathML baseline; the independent Python converter emits them directly.",
+  "expectations": [
+    {
+      "tex": "x^2",
+      "display": false,
+      "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow><msup><mi>x</mi><mn>2</mn></msup></mrow></math>"
+    },
+    {
+      "tex": "\\alpha + \\beta",
+      "display": false,
+      "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow><mi>α</mi><mo>+</mo><mi>β</mi></mrow></math>"
+    },
+    {
+      "tex": "\\frac{a}{b}",
+      "display": true,
+      "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mfrac><mi>a</mi><mi>b</mi></mfrac></mrow></math>"
+    },
+    {
+      "tex": "x_i + \\sqrt{2}",
+      "display": true,
+      "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><msub><mi>x</mi><mi>i</mi></msub><mo>+</mo><msqrt><mn>2</mn></msqrt></mrow></math>"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:foundation-diagnostic",
+  "title": "Publisle beta foundation diagnostic",
+  "type": "object",
+  "properties": {
+    "code": {
+      "enum": [
+        "invalid-json",
+        "duplicate-json-member",
+        "invalid-json-unicode",
+        "invalid-json-number",
+        "json-limit-exceeded",
+        "invalid-contract",
+        "unsupported-contract",
+        "invalid-data"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "pointer": {
+      "type": "string"
+    },
+    "offset": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": ["code", "message"],
+  "additionalProperties": false
+}

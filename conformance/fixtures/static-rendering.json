@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 1,
+  "metadata": {
+    "title": "Portable rendering subset",
+    "language": "en",
+    "direction": "ltr"
+  },
+  "blocks": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "type": "publisle:heading",
+      "schemaVersion": 1,
+      "data": {
+        "level": 2,
+        "label": "methods",
+        "content": [
+          {
+            "type": "text",
+            "value": "Portable methods"
+          }
+        ]
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "type": "publisle:paragraph",
+      "schemaVersion": 1,
+      "data": {
+        "content": [
+          {
+            "type": "text",
+            "value": "Research "
+          },
+          {
+            "type": "strong",
+            "children": [
+              {
+                "type": "text",
+                "value": "structure"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "value": " "
+          },
+          {
+            "type": "text",
+            "value": "مرحبا",
+            "direction": "rtl"
+          },
+          {
+            "type": "text",
+            "value": " "
+          },
+          {
+            "type": "link",
+            "url": "https://example.com",
+            "children": [
+              {
+                "type": "text",
+                "value": "source"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "value": " "
+          },
+          {
+            "type": "crossReference",
+            "target": "methods",
+            "children": [
+              {
+                "type": "text",
+                "value": "Methods"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "value": " "
+          },
+          {
+            "type": "inlineMath",
+            "value": "x^2"
+          },
+          {
+            "type": "text",
+            "value": " grows, and "
+          },
+          {
+            "type": "inlineMath",
+            "value": "\\alpha + \\beta"
+          },
+          {
+            "type": "text",
+            "value": " bounds it. "
+          },
+          {
+            "type": "footnoteReference",
+            "identifier": "1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000009",
+      "type": "publisle:math",
+      "schemaVersion": 1,
+      "data": {
+        "value": "\\frac{a}{b}",
+        "display": true,
+        "label": "ratio"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-00000000000a",
+      "type": "publisle:math",
+      "schemaVersion": 1,
+      "data": {
+        "value": "x_i + \\sqrt{2}",
+        "display": true
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "type": "publisle:list",
+      "schemaVersion": 1,
+      "data": {
+        "ordered": true,
+        "items": [
+          {
+            "children": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "First result"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "children": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Second result"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "type": "publisle:quote",
+      "schemaVersion": 1,
+      "data": {
+        "children": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "value": "Quoted observation"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "type": "publisle:code",
+      "schemaVersion": 1,
+      "data": {
+        "value": "x < 2",
+        "language": "python"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "type": "publisle:figure",
+      "schemaVersion": 1,
+      "data": {
+        "src": "diagram.png",
+        "alt": "Diagram description",
+        "label": "diagram",
+        "caption": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "value": "Measured figure"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "type": "publisle:table",
+      "schemaVersion": 1,
+      "data": {
+        "label": "results",
+        "caption": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "value": "Results table"
+              }
+            ]
+          }
+        ],
+        "headerRows": 1,
+        "rows": [
+          [
+            [
+              {
+                "type": "text",
+                "value": "Sample"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "value": "Value"
+              }
+            ]
+          ],
+          [
+            [
+              {
+                "type": "text",
+                "value": "A"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "value": "10"
+              }
+            ]
+          ]
+        ],
+        "align": ["left", "right"]
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000008",
+      "type": "publisle:footnote",
+      "schemaVersion": 1,
+      "data": {
+        "identifier": "1",
+        "children": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "value": "Authored research note"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

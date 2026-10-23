@@ -1,0 +1,97 @@
+[
+  {
+    "id": "duplicate",
+    "text": "{\"a\":1,\"a\":2}",
+    "code": "duplicate-json-member"
+  },
+  {
+    "id": "decoded-duplicate",
+    "text": "{\"a\":1,\"\\u0061\":2}",
+    "code": "duplicate-json-member"
+  },
+  {
+    "id": "nested-duplicate",
+    "text": "[{\"nested\":{\"x\":true,\"x\":false}}]",
+    "code": "duplicate-json-member"
+  },
+  {
+    "id": "surrogate-value",
+    "text": "\"\\ud800\"",
+    "code": "invalid-json-unicode"
+  },
+  {
+    "id": "surrogate-key",
+    "text": "{\"\\udfff\":1}",
+    "code": "invalid-json-unicode"
+  },
+  {
+    "id": "overflow",
+    "text": "1e400",
+    "code": "invalid-json-number"
+  },
+  {
+    "id": "nan",
+    "text": "NaN",
+    "code": "invalid-json"
+  },
+  {
+    "id": "leading-zero",
+    "text": "01",
+    "code": "invalid-json"
+  },
+  {
+    "id": "trailing-comma",
+    "text": "{\"a\":1,}",
+    "code": "invalid-json"
+  },
+  {
+    "id": "trailing-value",
+    "text": "{} []",
+    "code": "invalid-json"
+  },
+  {
+    "id": "unterminated",
+    "text": "\"unterminated",
+    "code": "invalid-json"
+  },
+  {
+    "id": "bad-escape",
+    "text": "\"\\x41\"",
+    "code": "invalid-json"
+  },
+  {
+    "id": "control-character",
+    "text": "\"line\nbreak\"",
+    "code": "invalid-json"
+  },
+  {
+    "id": "empty",
+    "text": "",
+    "code": "invalid-json"
+  },
+  {
+    "id": "comment",
+    "text": "/* x */ {}",
+    "code": "invalid-json"
+  },
+  {
+    "id": "bom",
+    "text": "﻿{}",
+    "code": "invalid-json"
+  },
+  {
+    "id": "bad-utf8",
+    "bytes": [195, 40],
+    "code": "invalid-json-unicode"
+  },
+  {
+    "id": "truncated-utf8",
+    "bytes": [226, 130],
+    "code": "invalid-json-unicode"
+  },
+  {
+    "id": "byte-bom",
+    "bytes": [239, 187, 191, 123, 125],
+    "code": "invalid-json"
+  }
+]

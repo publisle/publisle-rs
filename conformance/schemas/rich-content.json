@@ -1,0 +1,354 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:rich-content",
+  "title": "Publisle beta rich-content",
+  "$defs": {
+    "inline": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "text"
+            },
+            "value": {
+              "type": "string"
+            },
+            "direction": {
+              "enum": ["ltr", "rtl", "auto"]
+            }
+          },
+          "required": ["type", "value"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": ["inlineCode", "inlineMath", "rawHtml"]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": ["type", "value"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": ["emphasis", "strong", "strikethrough"]
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:publisle:schema:rich-content#/$defs/inline"
+              }
+            }
+          },
+          "required": ["type", "children"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "link"
+            },
+            "url": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:publisle:schema:rich-content#/$defs/inline"
+              }
+            }
+          },
+          "required": ["type", "url", "children"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "inlineImage"
+            },
+            "url": {
+              "type": "string"
+            },
+            "alt": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": ["type", "url", "alt"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": ["hardBreak", "softBreak"]
+            }
+          },
+          "required": ["type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "footnoteReference"
+            },
+            "identifier": {
+              "type": "string"
+            }
+          },
+          "required": ["type", "identifier"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "citationReference"
+            },
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "[^\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]"
+                  },
+                  "locator": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "suppressAuthor": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["id"],
+                "additionalProperties": false
+              }
+            },
+            "prefix": {
+              "type": "string"
+            },
+            "suffix": {
+              "type": "string"
+            }
+          },
+          "required": ["type", "items"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "crossReference"
+            },
+            "target": {
+              "type": "string",
+              "pattern": "[^\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:publisle:schema:rich-content#/$defs/inline"
+              }
+            }
+          },
+          "required": ["type", "target"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "flow": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "paragraph"
+            },
+            "content": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:publisle:schema:rich-content#/$defs/inline"
+              }
+            }
+          },
+          "required": ["type", "content"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "heading"
+            },
+            "level": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "content": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:publisle:schema:rich-content#/$defs/inline"
+              }
+            }
+          },
+          "required": ["type", "level", "content"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "quote"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+              }
+            }
+          },
+          "required": ["type", "children"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "list"
+            },
+            "ordered": {
+              "type": "boolean"
+            },
+            "start": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:publisle:schema:rich-content#/$defs/listItem"
+              }
+            }
+          },
+          "required": ["type", "ordered", "items"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "code"
+            },
+            "value": {
+              "type": "string"
+            },
+            "language": {
+              "type": "string"
+            },
+            "meta": {
+              "type": "string"
+            }
+          },
+          "required": ["type", "value"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "divider"
+            }
+          },
+          "required": ["type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "rawHtml"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": ["type", "value"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "listItem": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "listItem"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+              }
+            }
+          },
+          "required": ["type", "children"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "taskListItem"
+            },
+            "checked": {
+              "type": "boolean"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+              }
+            }
+          },
+          "required": ["type", "checked", "children"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "inlineArray": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/inline"
+      }
+    },
+    "flowArray": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    }
+  },
+  "$ref": "#/$defs/flowArray"
+}

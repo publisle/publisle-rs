@@ -1,0 +1,426 @@
+[
+  {
+    "id": "nested-nodes-references-resources",
+    "valid": true,
+    "declaration": {
+      "root": {
+        "properties": {
+          "body": {
+            "items": {
+              "ref": "node"
+            }
+          },
+          "footer": {
+            "optional": true,
+            "items": {
+              "ref": "node"
+            }
+          }
+        }
+      },
+      "rules": {
+        "node": {
+          "tag": {
+            "property": "type",
+            "cases": {
+              "heading": {
+                "emit": {
+                  "kind": "node",
+                  "type": "heading"
+                }
+              },
+              "paragraph": {
+                "emit": {
+                  "kind": "node",
+                  "type": "paragraph"
+                },
+                "properties": {
+                  "children": {
+                    "optional": true,
+                    "items": {
+                      "ref": "node"
+                    }
+                  }
+                }
+              },
+              "image": {
+                "properties": {
+                  "src": {
+                    "emit": {
+                      "kind": "resource"
+                    }
+                  }
+                }
+              },
+              "crossReference": {
+                "emit": {
+                  "kind": "reference",
+                  "type": "crossReference"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "data": {
+      "body": [
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "heading",
+              "level": 2,
+              "label": "nested"
+            },
+            {
+              "type": "image",
+              "src": "nested.svg"
+            },
+            {
+              "type": "crossReference",
+              "target": "nested"
+            }
+          ]
+        }
+      ]
+    },
+    "pointers": [
+      "/body/0",
+      "/body/0/children/0",
+      "/body/0/children/1/src",
+      "/body/0/children/2"
+    ]
+  },
+  {
+    "id": "optional-absent",
+    "valid": true,
+    "declaration": {
+      "root": {
+        "properties": {
+          "body": {
+            "items": {
+              "ref": "node"
+            }
+          },
+          "footer": {
+            "optional": true,
+            "items": {
+              "ref": "node"
+            }
+          }
+        }
+      },
+      "rules": {
+        "node": {
+          "tag": {
+            "property": "type",
+            "cases": {
+              "heading": {
+                "emit": {
+                  "kind": "node",
+                  "type": "heading"
+                }
+              },
+              "paragraph": {
+                "emit": {
+                  "kind": "node",
+                  "type": "paragraph"
+                },
+                "properties": {
+                  "children": {
+                    "optional": true,
+                    "items": {
+                      "ref": "node"
+                    }
+                  }
+                }
+              },
+              "image": {
+                "properties": {
+                  "src": {
+                    "emit": {
+                      "kind": "resource"
+                    }
+                  }
+                }
+              },
+              "crossReference": {
+                "emit": {
+                  "kind": "reference",
+                  "type": "crossReference"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "data": {
+      "body": []
+    },
+    "pointers": []
+  },
+  {
+    "id": "unknown-tag-retained-not-scanned",
+    "valid": true,
+    "declaration": {
+      "root": {
+        "properties": {
+          "body": {
+            "items": {
+              "ref": "node"
+            }
+          },
+          "footer": {
+            "optional": true,
+            "items": {
+              "ref": "node"
+            }
+          }
+        }
+      },
+      "rules": {
+        "node": {
+          "tag": {
+            "property": "type",
+            "cases": {
+              "heading": {
+                "emit": {
+                  "kind": "node",
+                  "type": "heading"
+                }
+              },
+              "paragraph": {
+                "emit": {
+                  "kind": "node",
+                  "type": "paragraph"
+                },
+                "properties": {
+                  "children": {
+                    "optional": true,
+                    "items": {
+                      "ref": "node"
+                    }
+                  }
+                }
+              },
+              "image": {
+                "properties": {
+                  "src": {
+                    "emit": {
+                      "kind": "resource"
+                    }
+                  }
+                }
+              },
+              "crossReference": {
+                "emit": {
+                  "kind": "reference",
+                  "type": "crossReference"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "data": {
+      "body": [
+        {
+          "type": "future",
+          "hidden": {
+            "type": "crossReference",
+            "target": "not-scanned"
+          }
+        }
+      ]
+    },
+    "pointers": ["/body/0"],
+    "unresolved": true
+  },
+  {
+    "id": "required-location-missing",
+    "valid": false,
+    "declaration": {
+      "root": {
+        "properties": {
+          "body": {
+            "items": {
+              "ref": "node"
+            }
+          },
+          "footer": {
+            "optional": true,
+            "items": {
+              "ref": "node"
+            }
+          }
+        }
+      },
+      "rules": {
+        "node": {
+          "tag": {
+            "property": "type",
+            "cases": {
+              "heading": {
+                "emit": {
+                  "kind": "node",
+                  "type": "heading"
+                }
+              },
+              "paragraph": {
+                "emit": {
+                  "kind": "node",
+                  "type": "paragraph"
+                },
+                "properties": {
+                  "children": {
+                    "optional": true,
+                    "items": {
+                      "ref": "node"
+                    }
+                  }
+                }
+              },
+              "image": {
+                "properties": {
+                  "src": {
+                    "emit": {
+                      "kind": "resource"
+                    }
+                  }
+                }
+              },
+              "crossReference": {
+                "emit": {
+                  "kind": "reference",
+                  "type": "crossReference"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "data": {}
+  },
+  {
+    "id": "optional-null-not-missing",
+    "valid": false,
+    "declaration": {
+      "root": {
+        "properties": {
+          "body": {
+            "items": {
+              "ref": "node"
+            }
+          },
+          "footer": {
+            "optional": true,
+            "items": {
+              "ref": "node"
+            }
+          }
+        }
+      },
+      "rules": {
+        "node": {
+          "tag": {
+            "property": "type",
+            "cases": {
+              "heading": {
+                "emit": {
+                  "kind": "node",
+                  "type": "heading"
+                }
+              },
+              "paragraph": {
+                "emit": {
+                  "kind": "node",
+                  "type": "paragraph"
+                },
+                "properties": {
+                  "children": {
+                    "optional": true,
+                    "items": {
+                      "ref": "node"
+                    }
+                  }
+                }
+              },
+              "image": {
+                "properties": {
+                  "src": {
+                    "emit": {
+                      "kind": "resource"
+                    }
+                  }
+                }
+              },
+              "crossReference": {
+                "emit": {
+                  "kind": "reference",
+                  "type": "crossReference"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "data": {
+      "body": [],
+      "footer": null
+    }
+  },
+  {
+    "id": "dangling-rule-reference",
+    "valid": false,
+    "declaration": {
+      "root": {
+        "ref": "absent"
+      }
+    },
+    "data": {}
+  },
+  {
+    "id": "nonproductive-rule-cycle",
+    "valid": false,
+    "declaration": {
+      "root": {
+        "ref": "loop"
+      },
+      "rules": {
+        "loop": {
+          "ref": "loop"
+        }
+      }
+    },
+    "data": {}
+  },
+  {
+    "id": "selector-not-supported",
+    "valid": false,
+    "declaration": {
+      "root": {
+        "properties": {
+          "*": {}
+        }
+      }
+    },
+    "data": {
+      "*": 1
+    }
+  },
+  {
+    "id": "executable-string-not-a-rule",
+    "valid": false,
+    "declaration": {
+      "root": {
+        "evaluate": "eval(payload)"
+      }
+    },
+    "data": {}
+  }
+]

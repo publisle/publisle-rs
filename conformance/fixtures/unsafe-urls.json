@@ -1,0 +1,14 @@
+[
+  { "url": "java\tscript:alert(1)", "safe": false },
+  { "url": "java\nscript:alert(1)", "safe": false },
+  { "url": "java\rscript:alert(1)", "safe": false },
+  { "url": "\u0000 JaVaScRiPt:alert(1)", "safe": false },
+  { "url": "vb\tscript:msgbox(1)", "safe": false },
+  { "url": "da\nta:text/html,bad", "safe": false },
+  { "url": "java script:alert(1)", "safe": false },
+  { "url": "https://example.com/?a=1&b=2", "safe": true },
+  { "url": "/relative?q=javascript:", "safe": true },
+  { "url": "#section", "safe": true },
+  { "url": "mailto:author@example.com", "safe": true },
+  { "url": "https://example.com/javascript:ok", "safe": true }
+]

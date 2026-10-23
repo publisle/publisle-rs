@@ -234,7 +234,7 @@ mod tests {
             "gibbs-overshoot-dark.svg",
         ] {
             let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../sites/www/public")
+                .join("../../conformance/figures")
                 .join(name);
             let result = tree(&path, &fonts).unwrap();
             assert!(!result.root().children().is_empty(), "{name}");

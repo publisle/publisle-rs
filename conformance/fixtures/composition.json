@@ -1,0 +1,176 @@
+{
+  "data": {
+    "value": 1,
+    "mode": "idle"
+  },
+  "semantics": {
+    "entities": [
+      {
+        "id": "value",
+        "kind": "input",
+        "name": "Parameter",
+        "origin": "declared-rule",
+        "binding": "/value",
+        "valueType": "number"
+      },
+      {
+        "id": "mode",
+        "kind": "state",
+        "name": "Finite mode",
+        "origin": "declared-rule",
+        "binding": "/mode",
+        "valueType": "string"
+      },
+      {
+        "id": "set",
+        "kind": "action",
+        "name": "Assign parameter",
+        "origin": "declared-rule"
+      },
+      {
+        "id": "start",
+        "kind": "action",
+        "name": "Start",
+        "origin": "declared-rule"
+      },
+      {
+        "id": "choose",
+        "kind": "action",
+        "name": "Select authored preset",
+        "origin": "declared-rule"
+      },
+      {
+        "id": "display",
+        "kind": "view",
+        "name": "Parameter display",
+        "origin": "declared-rule",
+        "binding": "/value",
+        "valueType": "number"
+      },
+      {
+        "id": "axis",
+        "kind": "quantity",
+        "name": "Axis",
+        "origin": "authored"
+      }
+    ],
+    "composition": {
+      "profile": "urn:publisle:composition:beta",
+      "fields": [
+        {
+          "id": "value",
+          "binding": "/value",
+          "type": "number",
+          "writable": true,
+          "shareable": true,
+          "minimum": 0,
+          "maximum": 10
+        },
+        {
+          "id": "mode",
+          "binding": "/mode",
+          "type": "string",
+          "writable": true,
+          "shareable": false,
+          "values": ["idle", "running"]
+        }
+      ],
+      "presets": [
+        {
+          "id": "high",
+          "values": {
+            "value": 8,
+            "mode": "idle"
+          }
+        }
+      ],
+      "operations": [
+        {
+          "id": "set",
+          "kind": "assign",
+          "field": "value"
+        },
+        {
+          "id": "start",
+          "kind": "transition",
+          "field": "mode",
+          "from": "idle",
+          "to": "running"
+        },
+        {
+          "id": "choose",
+          "kind": "preset",
+          "preset": "high"
+        }
+      ],
+      "views": [
+        {
+          "id": "display",
+          "field": "value"
+        }
+      ],
+      "abstractions": [
+        {
+          "entity": "value",
+          "kind": "parameter-control"
+        },
+        {
+          "entity": "display",
+          "kind": "series"
+        },
+        {
+          "entity": "choose",
+          "kind": "narrative-action"
+        }
+      ],
+      "relations": [
+        {
+          "id": "axis-binding",
+          "kind": "series-axis",
+          "from": "display",
+          "to": "axis"
+        },
+        {
+          "id": "starts",
+          "kind": "action-state",
+          "from": "start",
+          "to": "mode"
+        },
+        {
+          "id": "illustrates",
+          "kind": "narrative-preset",
+          "from": "choose",
+          "to": "high"
+        }
+      ],
+      "ports": [
+        {
+          "id": "input",
+          "direction": "input",
+          "field": "value"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "field": "value"
+        }
+      ],
+      "observations": [
+        {
+          "id": "high-example",
+          "preset": "high",
+          "output": "display",
+          "explanation": "The high preset displays eight.",
+          "assertion": {
+            "expected": 8,
+            "tolerance": 0,
+            "provenance": {
+              "producer": "authored fixture",
+              "evidence": "fixture:composition-high"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:list",
+  "title": "Publisle beta list",
+  "type": "object",
+  "properties": {
+    "ordered": {
+      "type": "boolean"
+    },
+    "start": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/listItem"
+      }
+    }
+  },
+  "required": ["ordered", "items"],
+  "additionalProperties": false
+}

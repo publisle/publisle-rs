@@ -29,9 +29,12 @@ assert(
   ].includes(`${platform}-${architecture}`),
   "Unsupported platform",
 );
-const { version } = JSON.parse(
-  await readFile(join(root, "native/pdf/package-version.json"), "utf8"),
+const cargo = await readFile(
+  join(root, "crates/publisle-pdf/Cargo.toml"),
+  "utf8",
 );
+const version = cargo.match(/^version = "([^"]+)"$/mu)?.[1];
+assert(version, "PDF crate version missing");
 const { stdout } = await promisify(execFile)(resolve(binary), ["--version"], {
   timeout: 10000,
   maxBuffer: 65536,
@@ -119,8 +122,8 @@ const manifest = {
   publishConfig: { access: "public" },
   repository: {
     type: "git",
-    url: "git+https://github.com/VoidReg/publisle.git",
-    directory: "native/pdf",
+    url: "git+https://github.com/publisle/publisle-rs.git",
+    directory: `npm/pdf-native-${platform}-${architecture}`,
   },
 };
 await writeFile(

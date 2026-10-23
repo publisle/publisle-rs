@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:diagram",
+  "title": "Publisle beta diagram",
+  "type": "object",
+  "properties": {
+    "engine": {
+      "anyOf": [
+        {
+          "enum": ["mermaid", "graphviz", "wavedrom", "plantuml"]
+        },
+        {
+          "type": "string",
+          "pattern": "^[^\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF:]+:[^\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]+$(?![\\s\\S])"
+        }
+      ]
+    },
+    "source": {
+      "type": "string"
+    },
+    "alt": {
+      "type": "string"
+    },
+    "label": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+    },
+    "caption": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    },
+    "fallback": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/flow"
+      }
+    },
+    "printFallback": {
+      "type": "object",
+      "properties": {
+        "src": {
+          "type": "string"
+        },
+        "mediaType": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string"
+        }
+      },
+      "required": ["src"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["engine", "source", "alt"],
+  "additionalProperties": false
+}

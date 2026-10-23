@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:paragraph",
+  "title": "Publisle beta paragraph",
+  "type": "object",
+  "properties": {
+    "content": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/inline"
+      }
+    }
+  },
+  "required": ["content"],
+  "additionalProperties": false
+}

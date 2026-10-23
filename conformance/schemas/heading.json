@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:heading",
+  "title": "Publisle beta heading",
+  "type": "object",
+  "properties": {
+    "level": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6
+    },
+    "content": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:publisle:schema:rich-content#/$defs/inline"
+      }
+    },
+    "label": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+    },
+    "role": {
+      "enum": ["abstract", "section"]
+    }
+  },
+  "required": ["level", "content"],
+  "additionalProperties": false
+}

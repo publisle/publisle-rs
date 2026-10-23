@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 320" role="img" aria-label="Magnitude spectrum of an eight-point DFT: nonzero bins at frequencies 2 and 6" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+  <!-- Publisle brand: paper background, ink axes, vermilion spectrum. -->
+  <rect width="720" height="320" fill="#fffdfa"/>
+  <g stroke="#e8e2dc" stroke-width="1">
+    <line x1="70" y1="60" x2="680" y2="60"/>
+    <line x1="70" y1="120" x2="680" y2="120"/>
+    <line x1="70" y1="180" x2="680" y2="180"/>
+    <line x1="70" y1="240" x2="680" y2="240"/>
+  </g>
+  <line x1="70" y1="260" x2="680" y2="260" stroke="#1a1513" stroke-width="1.5"/>
+  <line x1="70" y1="40" x2="70" y2="260" stroke="#1a1513" stroke-width="1.5"/>
+  <g fill="#574f4b" font-size="12">
+    <text x="30" y="64">4</text>
+    <text x="30" y="124">3</text>
+    <text x="30" y="184">2</text>
+    <text x="30" y="244">1</text>
+    <text x="52" y="278">0</text>
+  </g>
+  <!-- Bins k = 0..7; magnitudes [0, 0, 4, 0, 0, 0, 4, 0]. -->
+  <g fill="#9b3214">
+    <rect x="96" y="256" width="56" height="4"/>
+    <rect x="170" y="256" width="56" height="4"/>
+    <rect x="244" y="60" width="56" height="200"/>
+    <rect x="318" y="256" width="56" height="4"/>
+    <rect x="392" y="256" width="56" height="4"/>
+    <rect x="466" y="256" width="56" height="4"/>
+    <rect x="540" y="60" width="56" height="200"/>
+    <rect x="614" y="256" width="56" height="4"/>
+  </g>
+  <g fill="#574f4b" font-size="13" text-anchor="middle">
+    <text x="124" y="296">0</text>
+    <text x="198" y="296">1</text>
+    <text x="272" y="296">2</text>
+    <text x="346" y="296">3</text>
+    <text x="420" y="296">4</text>
+    <text x="494" y="296">5</text>
+    <text x="568" y="296">6</text>
+    <text x="642" y="296">7</text>
+  </g>
+  <text x="375" y="315" fill="#574f4b" font-size="13" text-anchor="middle">frequency bin k</text>
+  <g fill="#1a1513" font-size="13" text-anchor="middle">
+    <text x="272" y="50">|X[2]| = 4</text>
+    <text x="568" y="50">|X[6]| = 4</text>
+  </g>
+</svg>

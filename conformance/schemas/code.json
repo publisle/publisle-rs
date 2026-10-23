@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:code",
+  "title": "Publisle beta code",
+  "type": "object",
+  "properties": {
+    "value": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string"
+    },
+    "meta": {
+      "type": "string"
+    }
+  },
+  "required": ["value"],
+  "additionalProperties": false
+}

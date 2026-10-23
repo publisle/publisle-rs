@@ -10,9 +10,7 @@ import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 import sax from "sax";
 const execute = promisify(execFile);
-const require = createRequire(
-  new URL("../packages/pdf-service/package.json", import.meta.url),
-);
+const require = createRequire(import.meta.url);
 
 export function textGeometry(xml) {
   const parser = sax.parser(true);
@@ -188,7 +186,7 @@ export async function comparePdf(reference, candidate, output) {
   await mkdir(output, { recursive: true });
   const settings = JSON.parse(
     await readFile(
-      new URL("../native/pdf/reference.json", import.meta.url),
+      new URL("../crates/publisle-pdf/reference.json", import.meta.url),
       "utf8",
     ),
   ).comparison;

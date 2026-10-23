@@ -1,0 +1,280 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:block",
+  "title": "Publisle beta block",
+  "allOf": [
+    {
+      "$ref": "urn:publisle:schema:block-envelope"
+    },
+    {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:paragraph"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:paragraph"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:heading"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:heading"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:list"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:list"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:quote"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:quote"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:code"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:code"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:math"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:math"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:figure"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:figure"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:table"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:table"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:callout"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:callout"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:divider"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:divider"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:footnote"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:footnote"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:raw-html"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:raw-html"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:embed"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:embed"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:diagram"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:diagram"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "publisle:interactive-schematic"
+            },
+            "schemaVersion": {
+              "const": 2
+            },
+            "data": {
+              "$ref": "urn:publisle:schema:interactive-schematic"
+            }
+          },
+          "required": ["type", "schemaVersion", "data"],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "not": {
+                "enum": [
+                  "publisle:paragraph",
+                  "publisle:heading",
+                  "publisle:list",
+                  "publisle:quote",
+                  "publisle:code",
+                  "publisle:math",
+                  "publisle:figure",
+                  "publisle:table",
+                  "publisle:callout",
+                  "publisle:divider",
+                  "publisle:footnote",
+                  "publisle:raw-html",
+                  "publisle:embed",
+                  "publisle:diagram",
+                  "publisle:interactive-schematic"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

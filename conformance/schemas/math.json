@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:math",
+  "title": "Publisle beta math",
+  "type": "object",
+  "properties": {
+    "value": {
+      "type": "string"
+    },
+    "display": {
+      "type": "boolean"
+    },
+    "label": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+    }
+  },
+  "required": ["value", "display"],
+  "additionalProperties": false
+}

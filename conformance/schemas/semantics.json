@@ -1,0 +1,488 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:publisle:schema:semantics",
+  "type": "object",
+  "properties": {
+    "composition": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "const": "urn:publisle:composition:beta"
+        },
+        "fields": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              },
+              "binding": {
+                "type": "string"
+              },
+              "type": {
+                "enum": ["number", "integer", "string", "boolean"]
+              },
+              "writable": {
+                "type": "boolean"
+              },
+              "shareable": { "type": "boolean" },
+              "minimum": {
+                "type": "number"
+              },
+              "maximum": {
+                "type": "number"
+              },
+              "maxLength": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4096
+              },
+              "values": {
+                "type": "array",
+                "maxItems": 128,
+                "items": {
+                  "type": ["string", "number", "boolean"]
+                },
+                "minItems": 1
+              }
+            },
+            "required": ["id", "binding", "type", "writable", "shareable"],
+            "additionalProperties": false
+          }
+        },
+        "presets": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              },
+              "values": {
+                "type": "object",
+                "maxProperties": 128,
+                "additionalProperties": {
+                  "type": ["string", "number", "boolean"]
+                }
+              }
+            },
+            "required": ["id", "values"],
+            "additionalProperties": false
+          }
+        },
+        "operations": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+                  },
+                  "kind": {
+                    "const": "assign"
+                  },
+                  "field": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+                  }
+                },
+                "required": ["id", "kind", "field"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+                  },
+                  "kind": {
+                    "const": "preset"
+                  },
+                  "preset": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+                  }
+                },
+                "required": ["id", "kind", "preset"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+                  },
+                  "kind": {
+                    "const": "transition"
+                  },
+                  "field": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+                  },
+                  "from": {
+                    "type": ["string", "number", "boolean"]
+                  },
+                  "to": {
+                    "type": ["string", "number", "boolean"]
+                  }
+                },
+                "required": ["id", "kind", "field", "from", "to"],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "views": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              },
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              }
+            },
+            "required": ["id", "field"],
+            "additionalProperties": false
+          }
+        },
+        "abstractions": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "properties": {
+              "entity": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              },
+              "kind": {
+                "enum": [
+                  "parameter-control",
+                  "plot",
+                  "series",
+                  "table",
+                  "state-diagram",
+                  "image-annotation",
+                  "scene-entity",
+                  "narrative-action"
+                ]
+              }
+            },
+            "required": ["entity", "kind"],
+            "additionalProperties": false
+          }
+        },
+        "relations": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              },
+              "kind": {
+                "enum": [
+                  "dependency",
+                  "containment",
+                  "series-axis",
+                  "action-state",
+                  "narrative-preset"
+                ]
+              },
+              "from": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              }
+            },
+            "required": ["id", "kind", "from", "to"],
+            "additionalProperties": false
+          }
+        },
+        "ports": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              },
+              "direction": {
+                "enum": ["input", "output"]
+              },
+              "presetSelection": { "const": true },
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              }
+            },
+            "required": ["id", "direction", "field"],
+            "additionalProperties": false
+          }
+        },
+        "observations": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              },
+              "preset": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              },
+              "output": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+              },
+              "explanation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "assertion": {
+                "type": "object",
+                "properties": {
+                  "expected": {
+                    "type": ["string", "number", "boolean"]
+                  },
+                  "tolerance": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "properties": {
+                      "producer": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "evidence": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      }
+                    },
+                    "required": ["producer", "evidence"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["expected", "tolerance", "provenance"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["id", "preset", "output", "explanation"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "profile",
+        "fields",
+        "presets",
+        "operations",
+        "views",
+        "abstractions",
+        "relations",
+        "ports",
+        "observations"
+      ],
+      "additionalProperties": false
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_:.-]*$(?![\\s\\S])"
+          },
+          "kind": {
+            "enum": [
+              "concept",
+              "quantity",
+              "input",
+              "output",
+              "action",
+              "state",
+              "view",
+              "assumption",
+              "evidence",
+              "relation"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "origin": {
+            "enum": ["authored", "declared-rule", "calculated-result"]
+          },
+          "description": {
+            "type": "string"
+          },
+          "binding": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "dimension": {
+            "type": "string"
+          },
+          "reset": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "interpretation": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4096
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4096
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4096
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4096
+          },
+          "domain": {
+            "$ref": "urn:publisle:schema:json-value"
+          },
+          "default": {
+            "$ref": "urn:publisle:schema:json-value"
+          },
+          "initial": {
+            "$ref": "urn:publisle:schema:json-value"
+          },
+          "valueType": {
+            "enum": [
+              "string",
+              "number",
+              "integer",
+              "boolean",
+              "object",
+              "array",
+              "null"
+            ]
+          },
+          "transient": {
+            "type": "boolean"
+          },
+          "implementation": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "enum": ["declarative", "implementation-bound"]
+              },
+              "identity": {
+                "type": "string"
+              },
+              "limitation": {
+                "type": "string"
+              }
+            },
+            "required": ["status"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "kind", "name", "origin"],
+        "additionalProperties": false
+      },
+      "maxItems": 4096
+    }
+  },
+  "required": ["entities"],
+  "additionalProperties": false
+}
