@@ -1,0 +1,58 @@
+{
+  "sourceRepository": "https://github.com/publisle/publisle",
+  "sourceCommit": "cc5f6662eb233f641b46457be2f09698f9d6793c",
+  "nativeCommits": [
+    {
+      "original": "19b4f7d359e8166d6adcd6f247309b3f67c97e33",
+      "extracted": "5a59d197cb3deff008b8dbda07cd28aed78eb17a"
+    },
+    {
+      "original": "628aa6a18d241b9bf22b5397127a1afdd6ef6374",
+      "extracted": "d079e013ab5dfc2a9616af545dd5801e029162ba"
+    },
+    {
+      "original": "3299b7afffded2523bb54a5fd8149502ab0a7612",
+      "extracted": "7e2404be18f9c3b9188f961d9d88966679c9c26c"
+    },
+    {
+      "original": "8c7aaa43f461cb7dec0e880dd51848626b49df25",
+      "extracted": "8d3250980e94281a6ca5513937150f4bf2f793b1"
+    },
+    {
+      "original": "43235adac52e66a1d332269b7179bcad192777b8",
+      "extracted": "61752d993f86a9912eac852e795946db8fbcd7b2"
+    },
+    {
+      "original": "cbb690e5ff707edfc2813d7158becb22e0268a2e",
+      "extracted": "1687b24cb8b56950955dda33b8b7cf863f9f4c27"
+    },
+    {
+      "original": "b0c62985e3cfa4be72bea1c2f873801ba40cea05",
+      "extracted": "d7d31cac39cca0f9557fad7848a0a4c462d40020"
+    },
+    {
+      "original": "a7fe13093d02eb9fee90d23156f1811d3e529cf9",
+      "extracted": "3ccd84f7ad58a77d6b9ca29d9f2c397924788b91"
+    },
+    {
+      "original": "1153088acc546254693f08a16aabef0a73598e8c",
+      "extracted": "a458d97f1a4c22f9fd12b79b93c5d6d13cccddbe"
+    },
+    {
+      "original": "0c1607187cbba5d8a026f190d90db54a0e569fb2",
+      "extracted": "13658eb798bfe1fb97b64f88e79fd9b13e1948cd"
+    },
+    {
+      "original": "6748805a29ae40571e45f595e45574ded52710bc",
+      "extracted": "d86d0403159800679e64350561791f07efa130e8"
+    },
+    {
+      "original": "ff740da0bc9e82026e59c3ae9561373e2c007160",
+      "extracted": "dd43897eb9abb0b059d62c04d7a350c13b87750f"
+    },
+    {
+      "original": "b9c12d94d5f94e1e4ff087ccc3d5753b6ffad490",
+      "extracted": "3f3aa7abcb989e104cd7716cfd580c9f2896813c"
+    }
+  ]
+}
