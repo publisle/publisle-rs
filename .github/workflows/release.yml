@@ -36,6 +36,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      actions: read
       id-token: write
     steps:
       - uses: actions/checkout@v7
@@ -51,12 +52,29 @@ jobs:
           pattern: native-pdf-*
           path: ${{ runner.temp }}/native-packages
           merge-multiple: true
+      - name: Restore accepted uploads from an earlier attempt of this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PREVIOUS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --paginate --slurp | jq -r '[.[].artifacts[] | select(.expired == false) | select(.name | startswith("native-publication-progress-"))] | sort_by(.id) | last | .name // empty')
+          if [ -n "$PREVIOUS" ]; then
+            gh run download "$GITHUB_RUN_ID" --name "$PREVIOUS" --dir "$RUNNER_TEMP/native-packages"
+          fi
       - name: Publish the exact five validated tarballs, then retain release evidence
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           git fetch --tags origin
           node tools/publish-npm.mjs "$RUNNER_TEMP/native-packages"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-publication-progress-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native-packages/accepted-uploads.json
+            ${{ runner.temp }}/native-packages/native-release.json
+          if-no-files-found: ignore
+          retention-days: 90
   release-pr:
     needs: validate
     if: github.repository == 'publisle/publisle-rs' && github.ref == 'refs/heads/main'
@@ -64,6 +82,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -71,7 +90,17 @@ jobs:
           persist-credentials: false
       - run: rustup show active-toolchain
       - uses: release-plz/action@v0.5
+        id: release-pr
         with:
           command: release-pr
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Validate the release PR created with GITHUB_TOKEN
+        if: steps.release-pr.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_JSON: ${{ steps.release-pr.outputs.pr }}
+        run: |
+          NUMBER=$(node -e 'console.log(JSON.parse(process.env.PR_JSON).number)')
+          BRANCH=$(gh pr view "$NUMBER" --json headRefName --jq .headRefName)
+          gh workflow run ci.yml --ref "$BRANCH"

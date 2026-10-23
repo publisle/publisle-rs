@@ -7,6 +7,19 @@ assert.equal(lock.schemaVersion, 1);
 assert.match(lock.sourceCommit, /^[a-f0-9]{40}$/u);
 for (const version of Object.values(lock.packages))
   assert.match(version, /^\d+\.\d+\.\d+$/u);
+if (process.argv.includes("--upstream")) {
+  for (const [name, version] of Object.entries(lock.packages)) {
+    const response = await fetch(
+      `https://raw.githubusercontent.com/publisle/publisle/${lock.sourceCommit}/packages/${name}/package.json`,
+    );
+    assert(response.ok, `${name}: upstream HTTP ${response.status}`);
+    assert.equal(
+      (await response.json()).version,
+      version,
+      `${name}: version mismatch`,
+    );
+  }
+}
 const paths = [];
 async function walk(directory) {
   for (const entry of await readdir(new URL(directory + "/", root), {

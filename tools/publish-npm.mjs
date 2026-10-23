@@ -1,5 +1,7 @@
 /** Publish only the five tarballs built and smoke-tested by this workflow run. */
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { publishPackages } from "./publication.mjs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { readFile, readdir, writeFile } from "node:fs/promises";
@@ -67,54 +69,73 @@ for (const file of files) {
   assert.equal(`${artifact.platform}-${artifact.architecture}`, target);
   const bytes = await readFile(path);
   const integrity = `sha512-${createHash("sha512").update(bytes).digest("base64")}`;
-  const response = await fetch(
-    `https://registry.npmjs.org/${encodeURIComponent(manifest.name)}/${version}`,
-  );
-  assert(
-    response.ok || response.status === 404,
-    `Registry HTTP ${response.status}`,
-  );
-  if (response.ok)
-    assert.equal(
-      (await response.json()).dist.integrity,
-      integrity,
-      `Conflicting immutable package ${manifest.name}`,
-    );
-  plan.push({
-    name: manifest.name,
-    version,
-    file,
-    integrity,
-    existing: response.ok,
-  });
+  plan.push({ name: manifest.name, version, file, integrity });
 }
-// Finish the whole immutable-version preflight before the first upload.
-for (const pkg of plan) {
-  if (!pkg.existing)
-    run("npm", [
-      "publish",
-      join(stage, pkg.file),
-      "--access",
-      "public",
-      "--provenance",
-      "--ignore-scripts",
-      "--registry",
-      "https://registry.npmjs.org/",
-    ]);
-  let verified = false;
-  for (let attempt = 0; attempt < 12; attempt++) {
-    const response = await fetch(
-      `https://registry.npmjs.org/${encodeURIComponent(pkg.name)}/${version}`,
-    );
-    if (response.ok) {
-      assert.equal((await response.json()).dist.integrity, pkg.integrity);
-      verified = true;
-      break;
+async function registry(pkg) {
+  const response = await fetch(
+    `https://registry.npmjs.org/${encodeURIComponent(pkg.name)}/${version}?verify=${Date.now()}`,
+    {
+      signal: AbortSignal.timeout(30000),
+      headers: { "cache-control": "no-cache" },
+    },
+  );
+  if (response.status === 404) return null;
+  assert(response.ok, `Registry HTTP ${response.status}`);
+  return response.json();
+}
+const progress = join(stage, "accepted-uploads.json");
+const saved = existsSync(progress)
+  ? JSON.parse(await readFile(progress, "utf8"))
+  : { commit, version, accepted: [] };
+assert.equal(
+  saved.commit,
+  commit,
+  "Upload progress belongs to another source commit",
+);
+assert.equal(
+  saved.version,
+  version,
+  "Upload progress belongs to another version",
+);
+const accepted = new Set(saved.accepted);
+await publishPackages(plan, {
+  accepted,
+  lookup: registry,
+  wait: () => new Promise((ok) => setTimeout(ok, 5000)),
+  save: async () =>
+    writeFile(
+      progress,
+      JSON.stringify({ commit, version, accepted: [...accepted] }, null, 2) +
+        "\n",
+    ),
+  upload: async (pkg) => {
+    try {
+      run("npm", [
+        "publish",
+        join(stage, pkg.file),
+        "--access",
+        "public",
+        "--provenance",
+        "--ignore-scripts",
+        "--registry",
+        "https://registry.npmjs.org/",
+      ]);
+    } catch (error) {
+      throw new Error(String(error) + "\n" + String(error.stderr ?? ""));
     }
-    assert.equal(response.status, 404);
-    await new Promise((ok) => setTimeout(ok, 5000));
-  }
-  assert(verified, `Registry did not confirm ${pkg.name}`);
+  },
+});
+// Verify the registry's actual downloaded bytes, not only its integrity metadata.
+for (const pkg of plan) {
+  const metadata = await registry(pkg);
+  const response = await fetch(metadata.dist.tarball, {
+    signal: AbortSignal.timeout(60000),
+  });
+  assert(response.ok, `Tarball HTTP ${response.status}`);
+  const integrity = `sha512-${createHash("sha512")
+    .update(Buffer.from(await response.arrayBuffer()))
+    .digest("base64")}`;
+  assert.equal(integrity, pkg.integrity, `Changed public tarball: ${pkg.name}`);
 }
 const evidence = join(stage, "native-release.json");
 await writeFile(
