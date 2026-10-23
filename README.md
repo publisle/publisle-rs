@@ -37,7 +37,7 @@ node tools/npm-trusted-publishers.mjs --audit
 
 Use npm >=12.2 and a browser-authenticated account with package administration rights. `NPM_CLI_PATH` and `NPM_CONFIG_USERCONFIG` can select a separate CLI and login.
 
-The npm publisher waits for the `publisle-pdf-vVERSION` crate release tag at the exact source commit and the corresponding crates.io version. It preflights all five immutable versions before uploading anything; recovery accepts an existing version only when its tarball SHA-512 matches. A workflow dispatch at the same commit can finish a partial release. The crate release retains the tarballs and `native-release.json` as evidence. Never bump versions to hide a partial publication.
+The npm publisher waits for the `publisle-pdf-vVERSION` crate release tag at the exact source commit and the corresponding crates.io version. It preflights all five immutable versions before uploading anything; recovery accepts an existing version only when its tarball SHA-512 matches. Use **Re-run failed jobs** on the original run to finish a partial release from its retained tarballs and upload record. Never rerun validation or rebuild after an upload has been accepted. The crate release retains the tarballs and `native-release.json` as evidence. Never bump versions to hide a partial publication.
 
 ## Migration boundary
 

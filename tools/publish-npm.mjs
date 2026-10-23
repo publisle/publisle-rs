@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 const run = (cmd, args) =>
   execFileSync(cmd, args, {
     encoding: "utf8",
-    stdio: ["ignore", "pipe", "inherit"],
+    stdio: ["ignore", "pipe", "pipe"],
   }).trim();
 const version = (
   await readFile(
