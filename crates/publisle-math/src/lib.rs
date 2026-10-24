@@ -748,7 +748,12 @@ impl Parser {
                 if command == "mathbb" {
                     text = blackboard(&text);
                 }
-                Ok(if command == "text" || command == "textrm" {
+                Ok(if command == "operatorname" {
+                    Math::Operator(text, AtomClass::Op)
+                } else if matches!(
+                    command.as_str(),
+                    "text" | "textrm" | "mathrm" | "mathbf" | "mathsf"
+                ) {
                     Math::PlainText(text)
                 } else {
                     Math::Text(text)
