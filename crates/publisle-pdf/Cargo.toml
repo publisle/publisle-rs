@@ -1,6 +1,6 @@
 [package]
 name = "publisle-pdf"
-version = "0.3.1"
+version = "0.4.0"
 edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -16,7 +16,7 @@ categories = ["text-processing", "rendering"]
 exclude = ["READINESS.json", "VERIFICATION.md", "reference.json"]
 
 [dependencies]
-publisle-math = { path = "../publisle-math", version = "0.1.0" }
+publisle-math = { path = "../publisle-math", version = "0.2.0" }
 flate2 = "1.1"
 pdf-writer = "0.15"
 rustybuzz = "0.20"

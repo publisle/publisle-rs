@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.3.1...publisle-pdf-v0.4.0) - 2026-10-24
+
+### Added
+
+- [**breaking**] improve native math and add facade and CLI crates ([#25](https://github.com/publisle/publisle-rs/pull/25))
+
+### Other
+
+- *(deps)* bump lopdf from 0.38.0 to 0.46.0 ([#22](https://github.com/publisle/publisle-rs/pull/22))
+- *(deps)* bump pdf-writer from 0.14.0 to 0.15.0 ([#19](https://github.com/publisle/publisle-rs/pull/19))
+
 ## [0.3.1](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.0.1...publisle-pdf-v0.3.1) - 2026-10-23
 
 ### Added
