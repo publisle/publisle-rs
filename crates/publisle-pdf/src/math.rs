@@ -348,8 +348,15 @@ pub fn layout(
                     Style::Text,
                 )?;
                 let x = (out.width - accent.width) / 2.;
-                let y = out.ascent + accent.descent;
-                out.ascent = y + accent.ascent;
+                // Text accents sit above the ink rather than a full em above
+                // the nominal math box. The glyph already has a raised bearing.
+                let bearing = match *kind {
+                    "hat" => 0.7,
+                    "tilde" => 0.65,
+                    _ => 0.45,
+                };
+                let y = out.ascent - size * bearing;
+                out.ascent = out.ascent.max(y + accent.ascent);
                 out.append(accent, x, y);
                 return Ok(out);
             }
