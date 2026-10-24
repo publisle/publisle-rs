@@ -65,6 +65,13 @@ impl AtomClass {
 #[non_exhaustive]
 /// Bounded math syntax tree independent of PDF fonts and layout.
 pub enum Math {
+    /// A display equation with an explicit label supplied by `\\tag`.
+    Tagged {
+        /// Equation contents without the label.
+        body: Box<Math>,
+        /// Literal equation label, without surrounding parentheses.
+        tag: String,
+    },
     /// Row.
     Row(Vec<Math>),
     /// Text.
@@ -123,6 +130,14 @@ pub fn xml(value: &str) -> String {
         .replace('"', "&quot;")
 }
 impl Math {
+    /// Explicit display-equation label, if one was authored.
+    pub fn equation_tag(&self) -> Option<&str> {
+        match self {
+            Self::Tagged { tag, .. } => Some(tag),
+            _ => None,
+        }
+    }
+
     /// Construct an operator with its standard spacing class.
     pub fn operator(value: String) -> Self {
         let class = AtomClass::of(&value);
@@ -144,6 +159,11 @@ impl Math {
     /// Mathml.
     pub fn mathml(&self) -> String {
         match self {
+            Self::Tagged { body, tag } => format!(
+                "<mtable><mlabeledtr><mtd><mtext>({})</mtext></mtd><mtd>{}</mtd></mlabeledtr></mtable>",
+                xml(tag),
+                body.mathml()
+            ),
             Self::Row(nodes) => format!(
                 "<mrow>{}</mrow>",
                 nodes.iter().map(Self::mathml).collect::<String>()
@@ -243,6 +263,7 @@ struct Parser {
     depth: usize,
     nodes: usize,
     warnings: Vec<Diagnostic>,
+    tag: Option<String>,
 }
 /// Parse.
 pub fn parse(value: &str) -> Result<Math> {
@@ -259,11 +280,19 @@ pub fn parse_with_diagnostics(value: &str) -> Result<(Math, Vec<Diagnostic>)> {
         depth: 0,
         nodes: 0,
         warnings: Vec::new(),
+        tag: None,
     };
     let result = parser.row(false)?;
     if parser.cursor != parser.input.len() {
         return Err(parser.error("Unexpected closing math group."));
     }
+    let result = match parser.tag {
+        Some(tag) => Math::Tagged {
+            body: Box::new(result),
+            tag,
+        },
+        None => result,
+    };
     Ok((result, parser.warnings))
 }
 impl Parser {
@@ -625,7 +654,13 @@ impl Parser {
                 Some([0.; 3]),
                 Box::new(self.argument()?),
             )),
-            "tag" => Ok(Math::PlainText(format!("({})", self.group_text()?))),
+            "tag" => {
+                if self.tag.is_some() {
+                    return Err(self.error("An equation can have only one explicit tag."));
+                }
+                self.tag = Some(self.group_text()?);
+                Ok(Math::Space(0.))
+            }
             "overset" | "underset" => {
                 let label = Box::new(self.argument()?);
                 let base = Box::new(self.argument()?);
@@ -1016,6 +1051,8 @@ mod regression_tests {
         assert!(tree.contains("<mfrac>"));
         assert_eq!(Math::operator("=".into()).atom_class(), AtomClass::Rel);
         assert_eq!(Math::operator("+".into()).atom_class(), AtomClass::Bin);
+        assert_eq!(parse(r"x=1\tag{A}").unwrap().equation_tag(), Some("A"));
+        assert!(parse(r"x\tag{A}\tag{B}").is_err());
         assert!(parse(r"\left(x").is_err());
         assert!(parse(r"x\right)").is_err());
     }

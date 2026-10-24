@@ -474,6 +474,19 @@ impl Builder<'_> {
                 }
                 continue;
             }
+            if let Block::Math {
+                value,
+                display: true,
+                label,
+            } = block
+                && let Ok(tree) = math::parse(value)
+                && let Some(tag) = tree.equation_tag()
+            {
+                if let Some(label) = label {
+                    self.references.insert(label.clone(), tag.to_string());
+                }
+                continue;
+            }
             let (kind, label) = match block {
                 Block::Figure { label, .. } => ("figure", label),
                 Block::Table { label, .. } => ("table", label),
@@ -940,6 +953,30 @@ impl Builder<'_> {
                 label,
             } => {
                 let tree = math::parse(value)?;
+                let explicit = tree.equation_tag();
+                let number = if *display {
+                    Some(format!(
+                        "({})",
+                        explicit
+                            .map(str::to_owned)
+                            .unwrap_or_else(|| (self.equations + 1).to_string())
+                    ))
+                } else {
+                    None
+                };
+                let rtl = self.rtl();
+                let number_shape = number
+                    .as_ref()
+                    .map(|text| {
+                        self.output
+                            .fonts
+                            .shape(text, self.body_size, "regular", rtl)
+                    })
+                    .transpose()?;
+                let number_margin = number_shape
+                    .as_ref()
+                    .map_or(0., |shape| shape.width + self.body_size * 0.5);
+
                 let mut b = math::layout(
                     &tree,
                     &mut self.output.fonts,
@@ -955,7 +992,7 @@ impl Builder<'_> {
                         math::Style::Text
                     },
                 )?;
-                let scale = ((self.width() - 24.) / b.width).min(1.);
+                let scale = ((self.width() - 2. * number_margin) / b.width).min(1.);
                 if scale < 0.65 {
                     return Err(Diagnostic::new(
                         "layout-overflow",
@@ -968,18 +1005,19 @@ impl Builder<'_> {
                 self.ensure(h)?;
                 self.cursor -= b.ascent + 6.;
                 let x = self.x() + (self.width() - b.width) / 2.;
-                let tag=self.tag("Formula",None,Some(value.clone()),Some(format!("<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\">{}</math>",tree.mathml())),false);
+                let formula = match &tree {
+                    publisle_math::Math::Tagged { body, .. } => body.as_ref(),
+                    _ => &tree,
+                };
+                let tag=self.tag("Formula",None,Some(value.clone()),Some(format!("<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\">{}</math>",formula.mathml())),false);
                 self.output.tags[tag].label = label.clone();
                 self.draw(Some(tag), x, self.cursor, DrawKind::Math(b));
-                if *display {
-                    self.equations += 1;
+                if let (Some(text), Some(shaped)) = (number, number_shape) {
+                    if explicit.is_none() {
+                        self.equations += 1;
+                    }
                     let n = self.tag("P", None, None, None, false);
-                    let text = format!("({})", self.equations);
-                    let rtl = self.rtl();
-                    let shaped = self
-                        .output
-                        .fonts
-                        .shape(&text, self.body_size, "regular", rtl)?;
+
                     self.draw(
                         Some(n),
                         self.x() + self.width() - shaped.width,
@@ -1558,7 +1596,10 @@ mod equation_regressions {
         for block in &mut blocks {
             block["kind"] = serde_json::json!("math");
         }
+        blocks.push(serde_json::json!({"kind":"math","value":r"x=3\tag{A}","display":true,"label":"eq:custom"}));
+        blocks.push(serde_json::json!({"kind":"math","value":"x=4","display":true}));
         blocks.push(serde_json::json!({"kind":"paragraph","inlines":[{"type":"text","value":"2","reference":{"kind":"cross","target":"eq:second"}}]}));
+        blocks.push(serde_json::json!({"kind":"paragraph","inlines":[{"type":"text","value":"A","reference":{"kind":"cross","target":"eq:custom"}}]}));
         let input: Input = serde_json::from_value(serde_json::json!({"schemaVersion":1,"template":"article","templateVersion":"1","article":{"title":"Equations","authors":["Ada"],"blocks":blocks},"citations":[],"bibliography":[],"assets":[],"fonts":[{"path":directory.join("DejaVuSerif.ttf"),"role":"regular"}]})).unwrap();
         let result = build(&input).unwrap();
         let texts: Vec<_> = result
@@ -1576,6 +1617,10 @@ mod equation_regressions {
         let size = crate::profiles::profile("article").unwrap().body_size;
         assert!(texts.contains(&("(1)", size)));
         assert!(texts.contains(&("(2)", size)));
+        assert!(texts.contains(&("(A)", size)));
+        assert!(texts.contains(&("(3)", size)));
+        assert!(!texts.iter().any(|(text, _)| *text == "(4)"));
+        assert!(texts.iter().any(|(text, _)| *text == "A"));
         assert!(texts.iter().any(|(text, _)| *text == "2"));
     }
 }

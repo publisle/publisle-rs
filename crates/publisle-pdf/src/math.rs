@@ -104,6 +104,15 @@ pub fn layout(
     style: Style,
 ) -> Result<BoxLayout> {
     match node {
+        Math::Tagged { body, .. } => {
+            if style != Style::Display {
+                return Err(Diagnostic::new(
+                    "math-tag-inline",
+                    "Explicit equation tags require display math.",
+                ));
+            }
+            layout(body, fonts, size, color, style)
+        }
         Math::Text(text) | Math::Operator(text, _) | Math::PlainText(text) => {
             let size = if style == Style::Display
                 && matches!(node, Math::Operator(op, _) if ["∑", "∏", "∐", "⋃", "⋂", "lim", "max", "min", "sup", "inf"].contains(&op.as_str()))

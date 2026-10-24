@@ -11,7 +11,8 @@
     "\\displaystyle\\sum_{i=0}^n x_i",
     "\\left(\\frac{1}{x}\\right)",
     "\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}",
-    "\\begin{cases}x&x>0\\\\-x&x<0\\end{cases}"
+    "\\begin{cases}x&x>0\\\\-x&x<0\\end{cases}",
+    "x=1\\tag{A}"
   ],
   "fallback": "\\unknownpublisle{x}",
   "displayEquations": [
