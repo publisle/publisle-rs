@@ -560,8 +560,28 @@ mod regression_tests {
     }
     #[test]
     fn variables_are_italic_but_functions_and_digits_remain_upright() {
+        for command in [
+            r"\mathrm{x}",
+            r"\operatorname{f}",
+            r"\mathbf{x}",
+            r"\mathsf{x}",
+        ] {
+            assert_eq!(
+                draw(command, Style::Text).runs[0].shaped.glyphs[0].font,
+                0,
+                "{command}"
+            );
+        }
         assert_eq!(draw("x", Style::Text).runs[0].shaped.glyphs[0].font, 2);
         assert_eq!(draw("1", Style::Text).runs[0].shaped.glyphs[0].font, 0);
+        assert_eq!(
+            draw(r"\mathrm{x}", Style::Text).runs[0].shaped.glyphs[0].font,
+            0
+        );
+        assert_eq!(
+            draw(r"\operatorname{f}", Style::Text).runs[0].shaped.glyphs[0].font,
+            0
+        );
         assert_eq!(draw(r"\sin", Style::Text).runs[0].shaped.glyphs[0].font, 0);
     }
     #[test]
