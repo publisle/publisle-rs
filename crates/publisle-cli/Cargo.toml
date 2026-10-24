@@ -1,6 +1,6 @@
 [package]
 name = "publisle-cli"
-version = "0.1.0"
+version = "0.1.1"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -19,7 +19,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive", "env"] }
-publisle-pdf = { path = "../publisle-pdf", version = "0.4.0" }
+publisle-pdf = { path = "../publisle-pdf", version = "0.5.0" }
 publisle-math = { path = "../publisle-math", version = "0.2.0" }
 serde_json = "1"
 

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.4.0...publisle-pdf-v0.5.0) - 2026-10-24
+
+### Added
+
+- [**breaking**] gate asset support behind build features ([#28](https://github.com/publisle/publisle-rs/pull/28))
+
 ## [0.4.0](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.3.1...publisle-pdf-v0.4.0) - 2026-10-24
 
 ### Added
