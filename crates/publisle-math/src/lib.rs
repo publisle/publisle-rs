@@ -1,8 +1,12 @@
+#![doc = include_str!("../README.md")]
+#![warn(missing_docs)]
 //! A bounded, non-executing parser for Publisle's TeX math contract.
 /// A bounded math parsing failure. Arbitrary TeX execution is never supported.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Diagnostic {
+    /// Stable diagnostic identifier.
     pub code: String,
+    /// Human-readable diagnostic detail.
     pub message: String,
 }
 impl Diagnostic {
@@ -19,29 +23,98 @@ impl std::fmt::Display for Diagnostic {
     }
 }
 impl std::error::Error for Diagnostic {}
+/// A result carrying a structured diagnostic on failure.
 pub type Result<T> = std::result::Result<T, Diagnostic>;
 
+/// TeX atom class used by layout engines to select inter-atom spacing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AtomClass {
+    /// Ordinary atom.
+    Ord,
+    /// Large operator or named function.
+    Op,
+    /// Binary operator.
+    Bin,
+    /// Relation operator.
+    Rel,
+    /// Opening delimiter.
+    Open,
+    /// Closing delimiter.
+    Close,
+    /// Punctuation atom.
+    Punct,
+}
+impl AtomClass {
+    /// Classify supported operator text using TeX's common atom classes.
+    pub fn of(value: &str) -> Self {
+        match value {
+            "+" | "−" | "-" | "×" | "÷" | "±" | "∓" | "⋅" | "∪" | "∩" => Self::Bin,
+            "=" | "<" | ">" | "≤" | "≥" | "≠" | "≈" | "≡" | "∈" | "∉" | "⊂" | "⊆" | "→" | "←"
+            | "⇒" | "⇔" | "∝" => Self::Rel,
+            "(" | "[" | "{" => Self::Open,
+            ")" | "]" | "}" => Self::Close,
+            "," | ";" | ":" => Self::Punct,
+            "∑" | "∏" | "∐" | "⋃" | "⋂" | "∫" | "∮" | "sin" | "cos" | "tan" | "log" | "ln"
+            | "exp" | "lim" | "max" | "min" | "sup" | "inf" | "det" | "gcd" | "Pr" | "sinh"
+            | "cosh" | "tanh" => Self::Op,
+            _ => Self::Ord,
+        }
+    }
+}
 #[derive(Clone, Debug)]
+#[non_exhaustive]
+/// Bounded math syntax tree independent of PDF fonts and layout.
 pub enum Math {
+    /// Row.
     Row(Vec<Math>),
+    /// Text.
     Text(String),
+    /// Plain text.
     PlainText(String),
-    Operator(String),
+    /// Operator.
+    Operator(String, AtomClass),
+    /// Space.
     Space(f32),
+    /// Fraction.
     Fraction(Box<Math>, Box<Math>),
+    /// Root.
     Root(Box<Math>),
+    /// Indexed root.
     IndexedRoot(Box<Math>, Box<Math>),
+    /// Scripts.
     Scripts {
+        /// Base.
         base: Box<Math>,
+        /// Sub.
         sub: Option<Box<Math>>,
+        /// Sup.
         sup: Option<Box<Math>>,
     },
+    /// Color.
     Color([f32; 3], Box<Math>),
+    /// Accent.
     Accent(&'static str, Box<Math>),
+    /// Over.
     Over(Box<Math>, Box<Math>),
+    /// Under.
+    Under(Box<Math>, Box<Math>),
+    /// Fenced.
+    Fenced {
+        /// Open.
+        open: String,
+        /// Close.
+        close: String,
+        /// Body.
+        body: Box<Math>,
+    },
+    /// Unsupported.
+    Unsupported(String),
+    /// Background.
     Background([f32; 3], Option<[f32; 3]>, Box<Math>),
+    /// Grid.
     Grid(Vec<Vec<Math>>),
 }
+/// Xml.
 pub fn xml(value: &str) -> String {
     value
         .replace('&', "&amp;")
@@ -50,6 +123,25 @@ pub fn xml(value: &str) -> String {
         .replace('"', "&quot;")
 }
 impl Math {
+    /// Construct an operator with its standard spacing class.
+    pub fn operator(value: String) -> Self {
+        let class = AtomClass::of(&value);
+        Self::Operator(value, class)
+    }
+    /// Effective atom class; scripts preserve their base's class.
+    pub fn atom_class(&self) -> AtomClass {
+        match self {
+            Self::Operator(_, class) => *class,
+            Self::Scripts { base, .. }
+            | Self::Color(_, base)
+            | Self::Over(base, _)
+            | Self::Under(base, _) => base.atom_class(),
+            Self::Fenced { .. } => AtomClass::Ord,
+            _ => AtomClass::Ord,
+        }
+    }
+
+    /// Mathml.
     pub fn mathml(&self) -> String {
         match self {
             Self::Row(nodes) => format!(
@@ -78,7 +170,7 @@ impl Math {
                     content
                 }
             }
-            Self::Operator(s) => format!("<mo>{}</mo>", xml(s)),
+            Self::Operator(s, _) => format!("<mo>{}</mo>", xml(s)),
             Self::Space(w) => format!("<mspace width=\"{w}em\"/>"),
             Self::Fraction(a, b) => format!("<mfrac>{}{}</mfrac>", a.mathml(), b.mathml()),
             Self::Root(a) => format!("<msqrt>{}</msqrt>", a.mathml()),
@@ -107,11 +199,28 @@ impl Math {
                 "<munder accentunder=\"true\">{}<mo>⏟</mo></munder>",
                 a.mathml()
             ),
+            Self::Unsupported(source) => format!(
+                "<mstyle mathcolor=\"red\"><mtext>{}</mtext></mstyle>",
+                xml(source)
+            ),
+            Self::Fenced { open, close, body } => format!(
+                "<mrow><mo stretchy=\"true\">{}</mo>{}<mo stretchy=\"true\">{}</mo></mrow>",
+                xml(open),
+                body.mathml(),
+                xml(close)
+            ),
+            Self::Under(a, b) => format!("<munder>{}{}</munder>", a.mathml(), b.mathml()),
             Self::Over(a, b) => format!("<mover>{}{}</mover>", a.mathml(), b.mathml()),
             Self::Accent(kind, a) => format!(
                 "<mover accent=\"true\">{}<mo>{}</mo></mover>",
                 a.mathml(),
-                if *kind == "bar" { "¯" } else { "→" }
+                match *kind {
+                    "bar" => "¯",
+                    "hat" => "^",
+                    "tilde" => "~",
+                    "dot" => "˙",
+                    _ => "→",
+                }
             ),
             Self::Grid(rows) => format!(
                 "<mtable>{}</mtable>",
@@ -133,8 +242,14 @@ struct Parser {
     cursor: usize,
     depth: usize,
     nodes: usize,
+    warnings: Vec<Diagnostic>,
 }
+/// Parse.
 pub fn parse(value: &str) -> Result<Math> {
+    parse_with_diagnostics(value).map(|(tree, _)| tree)
+}
+/// Parse bounded math, retaining warnings for visible unsupported commands.
+pub fn parse_with_diagnostics(value: &str) -> Result<(Math, Vec<Diagnostic>)> {
     if value.len() > 64 * 1024 {
         return Err(Diagnostic::new("math-limit", "Math source exceeds 64 KiB."));
     }
@@ -143,12 +258,13 @@ pub fn parse(value: &str) -> Result<Math> {
         cursor: 0,
         depth: 0,
         nodes: 0,
+        warnings: Vec::new(),
     };
     let result = parser.row(false)?;
     if parser.cursor != parser.input.len() {
         return Err(parser.error("Unexpected closing math group."));
     }
-    Ok(result)
+    Ok((result, parser.warnings))
 }
 impl Parser {
     fn error(&self, message: &str) -> Diagnostic {
@@ -290,6 +406,50 @@ impl Parser {
         self.depth -= 1;
         result
     }
+    fn delimiter(&mut self) -> Result<String> {
+        let c = self
+            .input
+            .get(self.cursor)
+            .copied()
+            .ok_or_else(|| self.error("Missing delimiter."))?;
+        if c == '\\' {
+            self.cursor += 1;
+            let start = self.cursor;
+            while self
+                .input
+                .get(self.cursor)
+                .is_some_and(|c| c.is_ascii_alphabetic())
+            {
+                self.cursor += 1;
+            }
+            let command: String = self.input[start..self.cursor].iter().collect();
+            return Ok(match command.as_str() {
+                "langle" => "⟨",
+                "rangle" => "⟩",
+                "lbrace" => "{",
+                "rbrace" => "}",
+                "lvert" | "rvert" | "vert" => "|",
+                "lVert" | "rVert" | "Vert" => "‖",
+                "" => {
+                    self.cursor += 1;
+                    match self.input.get(start) {
+                        Some('{') => "{",
+                        Some('}') => "}",
+                        Some('|') => "‖",
+                        _ => return Err(self.error("Unsupported delimiter.")),
+                    }
+                }
+                _ => return Err(self.error("Unsupported delimiter.")),
+            }
+            .into());
+        }
+        self.cursor += 1;
+        match c {
+            '.' => Ok(String::new()),
+            '(' | ')' | '[' | ']' | '|' | '/' => Ok(c.to_string()),
+            _ => Err(self.error("Unsupported delimiter.")),
+        }
+    }
     fn atom_inner(&mut self) -> Result<Math> {
         self.nodes += 1;
         if self.nodes > 8192 {
@@ -310,7 +470,7 @@ impl Parser {
             return Ok(if c.is_alphanumeric() {
                 Math::Text(c.to_string())
             } else {
-                Math::Operator(c.to_string())
+                Math::operator(c.to_string())
             });
         }
         let start = self.cursor;
@@ -329,7 +489,7 @@ impl Parser {
             self.cursor += 1;
             return match c {
                 ',' | ';' | ':' | ' ' | '!' => Ok(Math::Space(if c == '!' { -0.15 } else { 0.2 })),
-                '{' | '}' | '|' | '_' | '%' | '#' | '&' | '$' => Ok(Math::Operator(c.to_string())),
+                '{' | '}' | '|' | '_' | '%' | '#' | '&' | '$' => Ok(Math::operator(c.to_string())),
                 '\\' => Ok(Math::Space(1.0)),
                 _ => Err(self.error("Unknown escaped math token.")),
             };
@@ -452,10 +612,38 @@ impl Parser {
             return Ok(if symbol.chars().all(char::is_alphabetic) {
                 Math::Text(symbol.into())
             } else {
-                Math::Operator(symbol.into())
+                Math::operator(symbol.into())
             });
         }
         match command.as_str() {
+            "hat" | "widehat" => Ok(Math::Accent("hat", Box::new(self.argument()?))),
+            "tilde" | "widetilde" => Ok(Math::Accent("tilde", Box::new(self.argument()?))),
+            "dot" => Ok(Math::Accent("dot", Box::new(self.argument()?))),
+            "displaystyle" | "textstyle" => self.argument(),
+            "boxed" => Ok(Math::Background(
+                [1.; 3],
+                Some([0.; 3]),
+                Box::new(self.argument()?),
+            )),
+            "tag" => Ok(Math::PlainText(format!("({})", self.group_text()?))),
+            "overset" | "underset" => {
+                let label = Box::new(self.argument()?);
+                let base = Box::new(self.argument()?);
+                Ok(if command == "overset" {
+                    Math::Over(base, label)
+                } else {
+                    Math::Under(base, label)
+                })
+            }
+            "binom" => {
+                let top = self.argument()?;
+                let bottom = self.argument()?;
+                Ok(Math::Fenced {
+                    open: "(".into(),
+                    close: ")".into(),
+                    body: Box::new(Math::Grid(vec![vec![top], vec![bottom]])),
+                })
+            }
             "frac" | "dfrac" | "tfrac" => {
                 let a = self.argument()?;
                 let b = self.argument()?;
@@ -565,23 +753,66 @@ impl Parser {
             "vec" | "overrightarrow" => Ok(Math::Accent("arrow", Box::new(self.argument()?))),
             "underbrace" => Ok(Math::Accent("underbrace", Box::new(self.argument()?))),
             "xrightarrow" => Ok(Math::Over(
-                Box::new(Math::Operator("⟶".into())),
+                Box::new(Math::operator("⟶".into())),
                 Box::new(self.argument()?),
             )),
-            "left" | "right" | "bigl" | "bigr" | "big" | "Big" => {
+            "left" => {
                 self.skip();
-                if self.input.get(self.cursor) == Some(&'.') {
-                    self.cursor += 1;
-                    Ok(Math::Space(0.0))
-                } else {
-                    self.atom()
+                let open = self.delimiter()?;
+                let start = self.cursor;
+                let mut cursor = start;
+                let mut nesting = 0usize;
+                let mut end = None;
+                while cursor < self.input.len() {
+                    if self.input[cursor] == '\\' {
+                        let word_start = cursor + 1;
+                        let mut word_end = word_start;
+                        while self
+                            .input
+                            .get(word_end)
+                            .is_some_and(|c| c.is_ascii_alphabetic())
+                        {
+                            word_end += 1;
+                        }
+                        let word: String = self.input[word_start..word_end].iter().collect();
+                        if word == "left" {
+                            nesting += 1;
+                        }
+                        if word == "right" {
+                            if nesting == 0 {
+                                end = Some((cursor, word_end));
+                                break;
+                            }
+                            nesting -= 1;
+                        }
+                        cursor = word_end.max(cursor + 2);
+                    } else {
+                        cursor += 1;
+                    }
                 }
+                let (body_end, right_end) =
+                    end.ok_or_else(|| self.error("Unclosed left delimiter."))?;
+                let source: String = self.input[start..body_end].iter().collect();
+                let body = self.fragment(&source)?;
+                self.cursor = right_end;
+                self.skip();
+                let close = self.delimiter()?;
+                Ok(Math::Fenced {
+                    open,
+                    close,
+                    body: Box::new(body),
+                })
+            }
+            "right" => Err(self.error("Unmatched right delimiter.")),
+            "bigl" | "bigr" | "big" | "Big" => {
+                self.skip();
+                Ok(Math::operator(self.delimiter()?))
             }
             "quad" => Ok(Math::Space(1.0)),
             "qquad" => Ok(Math::Space(2.0)),
             "sinh" | "cosh" | "tanh" | "arg" | "gcd" | "Pr" | "bmod" | "sin" | "cos" | "tan"
             | "exp" | "log" | "ln" | "lim" | "sup" | "inf" | "max" | "min" | "det" => {
-                Ok(Math::Operator(command))
+                Ok(Math::operator(command))
             }
             "begin" => {
                 let env = self.group_text()?;
@@ -612,21 +843,36 @@ impl Parser {
                 self.cursor += remaining[..end + marker.len()].chars().count();
                 let grid = Math::Grid(rows);
                 Ok(match env.as_str() {
-                    "pmatrix" => Math::Row(vec![
-                        Math::Operator("(".into()),
-                        grid,
-                        Math::Operator(")".into()),
-                    ]),
-                    "bmatrix" => Math::Row(vec![
-                        Math::Operator("[".into()),
-                        grid,
-                        Math::Operator("]".into()),
-                    ]),
-                    "cases" => Math::Row(vec![Math::Operator("{".into()), grid]),
+                    "pmatrix" => Math::Fenced {
+                        open: "(".into(),
+                        close: ")".into(),
+                        body: Box::new(grid),
+                    },
+                    "bmatrix" => Math::Fenced {
+                        open: "[".into(),
+                        close: "]".into(),
+                        body: Box::new(grid),
+                    },
+                    "cases" => Math::Fenced {
+                        open: "{".into(),
+                        close: "".into(),
+                        body: Box::new(grid),
+                    },
                     _ => grid,
                 })
             }
-            _ => Err(self.error(&format!("Unsupported command \\{command}."))),
+            "input" | "include" | "write" | "openout" | "read" | "def" | "edef" | "gdef"
+            | "newcommand" | "usepackage" | "catcode" | "csname" => {
+                Err(self.error("TeX execution is unsupported."))
+            }
+            _ => {
+                let source = format!("\\{command}");
+                self.warnings.push(Diagnostic::new(
+                    "unsupported-math-command",
+                    format!("Unsupported command {source} was preserved in red."),
+                ));
+                Ok(Math::Unsupported(source))
+            }
         }
     }
 }
@@ -740,5 +986,37 @@ mod extraction_regressions {
     #[test]
     fn matrix_cells_cannot_discard_unmatched_closers() {
         assert!(parse(r"\begin{matrix}x}ignored\end{matrix}").is_err());
+    }
+}
+
+#[cfg(test)]
+mod regression_tests {
+    use super::*;
+    #[test]
+    fn requested_commands_and_unknown_fallback_preserve_content() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("regression-math.json")).unwrap();
+        for source in fixture["expressions"].as_array().unwrap() {
+            let (tree, warnings) = parse_with_diagnostics(source.as_str().unwrap()).unwrap();
+            assert!(warnings.is_empty(), "{source}: {warnings:?}");
+            assert!(!tree.mathml().is_empty());
+        }
+        let (tree, warnings) =
+            parse_with_diagnostics(fixture["fallback"].as_str().unwrap()).unwrap();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(warnings[0].code, "unsupported-math-command");
+        assert!(tree.mathml().contains("unknownpublisle"));
+        assert!(tree.mathml().contains("mathcolor=\"red\""));
+        assert!(tree.mathml().contains("<mi>x</mi>"));
+    }
+    #[test]
+    fn fences_and_atom_classes_survive_parsing() {
+        let tree = parse(r"\left(\frac{x}{y}\right)").unwrap().mathml();
+        assert!(tree.contains("stretchy=\"true\""));
+        assert!(tree.contains("<mfrac>"));
+        assert_eq!(Math::operator("=".into()).atom_class(), AtomClass::Rel);
+        assert_eq!(Math::operator("+".into()).atom_class(), AtomClass::Bin);
+        assert!(parse(r"\left(x").is_err());
+        assert!(parse(r"x\right)").is_err());
     }
 }

@@ -6,3 +6,16 @@ license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 description = "Bounded non-executing TeX math parser and MathML for Publisle"
+
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/publisle-math"
+keywords = ["tex", "latex", "math", "mathml", "parser"]
+categories = ["parser-implementations", "mathematics"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[dev-dependencies]
+serde_json = "1"

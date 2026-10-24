@@ -1,0 +1,30 @@
+{
+  "description": "Native math regressions; independent of the pinned upstream contract fixtures.",
+  "expressions": [
+    "\\hat{x}",
+    "\\tilde{x}+\\dot{x}",
+    "\\widehat{xy}",
+    "\\binom{n}{k}",
+    "\\overset{a}{=}",
+    "\\underset{a}{x}",
+    "\\boxed{x}",
+    "\\displaystyle\\sum_{i=0}^n x_i",
+    "\\left(\\frac{1}{x}\\right)",
+    "\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}",
+    "\\begin{cases}x&x>0\\\\-x&x<0\\end{cases}"
+  ],
+  "fallback": "\\unknownpublisle{x}",
+  "displayEquations": [
+    {
+      "value": "x=1",
+      "display": true,
+      "label": null
+    },
+    {
+      "value": "x+1=2",
+      "display": true,
+      "label": "eq:second"
+    }
+  ],
+  "expectedNumbers": ["(1)", "(2)"]
+}

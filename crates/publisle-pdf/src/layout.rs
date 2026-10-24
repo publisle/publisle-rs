@@ -477,7 +477,11 @@ impl Builder<'_> {
             let (kind, label) = match block {
                 Block::Figure { label, .. } => ("figure", label),
                 Block::Table { label, .. } => ("table", label),
-                Block::Math { label, .. } if label.is_some() => ("math", label),
+                Block::Math {
+                    label,
+                    display: true,
+                    ..
+                } => ("math", label),
                 _ => continue,
             };
             let ordinal = counts.entry(kind).or_default();
@@ -614,7 +618,13 @@ impl Builder<'_> {
                 }
                 Inline::Math { value } => {
                     let tree = math::parse(value)?;
-                    let b = math::layout(&tree, &mut self.output.fonts, size, [0.; 3])?;
+                    let b = math::layout(
+                        &tree,
+                        &mut self.output.fonts,
+                        size,
+                        [0.; 3],
+                        math::Style::Text,
+                    )?;
                     let xml = format!(
                         "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">{}</math>",
                         tree.mathml()
@@ -939,6 +949,11 @@ impl Builder<'_> {
                         self.body_size
                     },
                     [0.; 3],
+                    if *display {
+                        math::Style::Display
+                    } else {
+                        math::Style::Text
+                    },
                 )?;
                 let scale = ((self.width() - 24.) / b.width).min(1.);
                 if scale < 0.65 {
@@ -956,19 +971,22 @@ impl Builder<'_> {
                 let tag=self.tag("Formula",None,Some(value.clone()),Some(format!("<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\">{}</math>",tree.mathml())),false);
                 self.output.tags[tag].label = label.clone();
                 self.draw(Some(tag), x, self.cursor, DrawKind::Math(b));
-                if label.is_some() {
+                if *display {
                     self.equations += 1;
                     let n = self.tag("P", None, None, None, false);
                     let text = format!("({})", self.equations);
                     let rtl = self.rtl();
-                    let shaped = self.output.fonts.shape(&text, 9., "regular", rtl)?;
+                    let shaped = self
+                        .output
+                        .fonts
+                        .shape(&text, self.body_size, "regular", rtl)?;
                     self.draw(
                         Some(n),
                         self.x() + self.width() - shaped.width,
                         self.cursor,
                         DrawKind::Text {
                             shaped,
-                            size: 9.,
+                            size: self.body_size,
                             text,
                             link: None,
                             target: None,
@@ -1523,5 +1541,41 @@ mod bidi_tests {
     fn arabic_lines_are_right_aligned() {
         let p = visual_positions(&[piece("مرحبا "), piece("بالعالم")], true, 0., 100.);
         assert_eq!(p, [90., 80.]);
+    }
+}
+
+#[cfg(test)]
+mod equation_regressions {
+    use super::*;
+    #[test]
+    fn every_display_equation_is_numbered_and_label_references_keep_ordinal() {
+        let directory = std::path::PathBuf::from(
+            std::env::var_os("PUBLISLE_TEST_FONT_DIR").expect("Pinned fonts required"),
+        );
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("regression-math.json")).unwrap();
+        let mut blocks = fixture["displayEquations"].as_array().unwrap().clone();
+        for block in &mut blocks {
+            block["kind"] = serde_json::json!("math");
+        }
+        blocks.push(serde_json::json!({"kind":"paragraph","inlines":[{"type":"text","value":"2","reference":{"kind":"cross","target":"eq:second"}}]}));
+        let input: Input = serde_json::from_value(serde_json::json!({"schemaVersion":1,"template":"article","templateVersion":"1","article":{"title":"Equations","authors":["Ada"],"blocks":blocks},"citations":[],"bibliography":[],"assets":[],"fonts":[{"path":directory.join("DejaVuSerif.ttf"),"role":"regular"}]})).unwrap();
+        let result = build(&input).unwrap();
+        let texts: Vec<_> = result
+            .pages
+            .iter()
+            .flat_map(|p| &p.draws)
+            .filter_map(|draw| {
+                if let DrawKind::Text { text, size, .. } = &draw.kind {
+                    Some((text.as_str(), *size))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let size = crate::profiles::profile("article").unwrap().body_size;
+        assert!(texts.contains(&("(1)", size)));
+        assert!(texts.contains(&("(2)", size)));
+        assert!(texts.iter().any(|(text, _)| *text == "2"));
     }
 }

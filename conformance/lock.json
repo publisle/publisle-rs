@@ -52,5 +52,8 @@
     "figures/fft-spectrum.svg": "056c631851181e5040536d364bb5150c1417c2520255a6e78c5ee875866320d1",
     "figures/gibbs-overshoot-dark.svg": "d17112a3fcf402f26bc819b3fbdbbdc3014c761e4493b615f961ce39471abb64",
     "figures/gibbs-overshoot.svg": "9c3c977f8a3a7fe2db6e70d7204adb4f1d66af38e8702a22ad1c0bbc2fd35574"
+  },
+  "localFiles": {
+    "regressions/math.json": "b9ae4d20c4df80689986669cb8c23db8c1e62222520af651310d6bb693ee748f"
   }
 }

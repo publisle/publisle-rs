@@ -8,6 +8,10 @@ edition = "2024"
 rust-version = "1.90"
 repository = "https://github.com/publisle/publisle-rs"
 
+homepage = "https://publisle.xyz"
+authors = ["Publisle contributors"]
+readme = "README.md"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

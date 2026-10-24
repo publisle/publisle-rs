@@ -1,6 +1,15 @@
 [workspace]
 release_always = false
+semver_check = true
 
 [[package]]
 name = "publisle-pdf"
 changelog_include = ["publisle-math"]
+
+[[package]]
+name = "publisle"
+git_release_enable = false
+
+[[package]]
+name = "publisle-cli"
+git_release_enable = false
