@@ -15,6 +15,23 @@ keywords = ["pdf", "typesetting", "math", "publishing", "tagged-pdf"]
 categories = ["text-processing", "rendering"]
 exclude = ["READINESS.json", "VERIFICATION.md", "reference.json"]
 
+[features]
+default = ["cli", "raster", "svg", "pdf-import"]
+# Build the `publisle-pdf` executable that the npm platform packages ship.
+cli = []
+# Decode PNG and JPEG figures.
+raster = ["dep:image"]
+# Embed SVG figures as vector Form XObjects. Implies `pdf-import` because
+# converted SVG artwork is re-imported through the same bounded PDF path.
+svg = ["dep:resvg", "dep:svg2pdf", "pdf-import"]
+# Import PDF figures as Form XObjects.
+pdf-import = ["dep:lopdf"]
+
+[[bin]]
+name = "publisle-pdf"
+path = "src/main.rs"
+required-features = ["cli"]
+
 [dependencies]
 publisle-math = { path = "../publisle-math", version = "0.2.0" }
 flate2 = "1.1"
@@ -26,10 +43,10 @@ serde_json = "1.0"
 ttf-parser = "0.25"
 unicode-bidi = "0.3"
 unicode-linebreak = "0.1"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-resvg = { version = "0.45", default-features = false, features = ["text"] }
-svg2pdf = { version = "=0.13.0", default-features = false, features = ["text", "filters"] }
-lopdf = { version = "0.46", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"], optional = true }
+resvg = { version = "0.45", default-features = false, features = ["text"], optional = true }
+svg2pdf = { version = "=0.13.0", default-features = false, features = ["text", "filters"], optional = true }
+lopdf = { version = "0.46", default-features = false, optional = true }
 
 [package.metadata.docs.rs]
 all-features = true

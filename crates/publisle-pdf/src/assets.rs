@@ -2,6 +2,7 @@ use crate::{
     fonts::Fonts,
     model::{Diagnostic, Result},
 };
+#[cfg(feature = "pdf-import")]
 use lopdf::{Dictionary, Document, Object, ObjectId};
 use pdf_writer::{Filter, Name, Obj, Pdf, Rect, Ref, Str};
 use std::{
@@ -12,29 +13,39 @@ use std::{
 fn invalid(error: impl std::fmt::Display) -> Diagnostic {
     Diagnostic::new("invalid-image", error.to_string())
 }
+#[cfg(feature = "raster")]
 pub fn raster(path: &Path, fonts: &Fonts) -> Result<image::DynamicImage> {
     if path
         .extension()
         .and_then(|s| s.to_str())
         .is_some_and(|s| s.eq_ignore_ascii_case("svg"))
     {
-        let tree = crate::svg::tree(path, fonts)?;
-        let size = tree.size().to_int_size();
-        let mut pixmap = resvg::tiny_skia::Pixmap::new(size.width(), size.height())
-            .ok_or_else(|| invalid("Cannot allocate SVG image."))?;
-        resvg::render(
-            &tree,
-            resvg::tiny_skia::Transform::identity(),
-            &mut pixmap.as_mut(),
-        );
-        let mut pixels = Vec::with_capacity(pixmap.data().len());
-        for pixel in pixmap.pixels() {
-            let p = pixel.demultiply();
-            pixels.extend_from_slice(&[p.red(), p.green(), p.blue(), p.alpha()]);
+        #[cfg(feature = "svg")]
+        {
+            let tree = crate::svg::tree(path, fonts)?;
+            let size = tree.size().to_int_size();
+            let mut pixmap = resvg::tiny_skia::Pixmap::new(size.width(), size.height())
+                .ok_or_else(|| invalid("Cannot allocate SVG image."))?;
+            resvg::render(
+                &tree,
+                resvg::tiny_skia::Transform::identity(),
+                &mut pixmap.as_mut(),
+            );
+            let mut pixels = Vec::with_capacity(pixmap.data().len());
+            for pixel in pixmap.pixels() {
+                let p = pixel.demultiply();
+                pixels.extend_from_slice(&[p.red(), p.green(), p.blue(), p.alpha()]);
+            }
+            let image = image::RgbaImage::from_raw(size.width(), size.height(), pixels)
+                .ok_or_else(|| invalid("Invalid SVG raster."))?;
+            return Ok(image::DynamicImage::ImageRgba8(image));
         }
-        let image = image::RgbaImage::from_raw(size.width(), size.height(), pixels)
-            .ok_or_else(|| invalid("Invalid SVG raster."))?;
-        return Ok(image::DynamicImage::ImageRgba8(image));
+        #[cfg(not(feature = "svg"))]
+        {
+            return Err(invalid(
+                "SVG figures are disabled in this build; rebuild with the `svg` feature.",
+            ));
+        }
     }
     let mut reader = image::ImageReader::open(path).map_err(invalid)?;
     let mut limits = image::Limits::default();
@@ -55,17 +66,20 @@ pub fn raster(path: &Path, fonts: &Fonts) -> Result<image::DynamicImage> {
 
 /// A local PDF figure is imported as a Form XObject, preserving vector artwork.
 /// Page annotations, actions, attachments, and source structure tags are excluded.
+#[cfg(feature = "pdf-import")]
 pub struct PdfAsset {
     doc: Document,
     resources: Dictionary,
     content: Vec<u8>,
     pub bbox: [f32; 4],
 }
+#[cfg(feature = "pdf-import")]
 impl PdfAsset {
     pub fn load(path: &Path) -> Result<Self> {
         let doc = Document::load(path).map_err(invalid)?;
         Self::from_document(doc)
     }
+    #[cfg(feature = "svg")]
     pub fn from_svg(path: &Path, fonts: &Fonts) -> Result<Self> {
         let tree = crate::svg::tree(path, fonts)?;
         let bytes = svg2pdf::to_pdf(
@@ -211,6 +225,7 @@ impl PdfAsset {
         Ok(())
     }
 }
+#[cfg(feature = "pdf-import")]
 fn collect(
     object: &Object,
     doc: &Document,
@@ -247,6 +262,7 @@ fn collect(
     }
     Ok(())
 }
+#[cfg(feature = "pdf-import")]
 fn write_object(writer: Obj<'_>, object: &Object, mapping: &BTreeMap<ObjectId, Ref>) -> Result<()> {
     match object {
         Object::Null => writer.primitive(pdf_writer::Null),

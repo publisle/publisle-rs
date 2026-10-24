@@ -43,6 +43,7 @@ pub enum DrawKind {
         target: Option<String>,
     },
     Math(BoxLayout),
+    #[cfg(feature = "pdf-import")]
     Pdf {
         asset: Box<crate::assets::PdfAsset>,
         draw_width: f32,
@@ -376,6 +377,102 @@ impl Builder<'_> {
     }
     fn width(&self) -> f32 {
         (self.text_width - self.gutter * (self.columns - 1) as f32) / self.columns as f32
+    }
+    /// Size and embed a PDF or SVG figure as a Form XObject.
+    #[cfg(feature = "pdf-import")]
+    fn vector_figure(
+        path: &std::path::Path,
+        fonts: &Fonts,
+        text_width: f32,
+        is_svg: bool,
+    ) -> Result<(DrawKind, f32, f32)> {
+        let pdf = if is_svg {
+            #[cfg(feature = "svg")]
+            {
+                crate::assets::PdfAsset::from_svg(path, fonts)?
+            }
+            #[cfg(not(feature = "svg"))]
+            {
+                let _ = fonts;
+                return Err(Diagnostic::new(
+                    "asset-support",
+                    "SVG figures are disabled in this build; rebuild with the `svg` feature.",
+                ));
+            }
+        } else {
+            crate::assets::PdfAsset::load(path)?
+        };
+        let width = pdf.bbox[2] - pdf.bbox[0];
+        let height = pdf.bbox[3] - pdf.bbox[1];
+        let scale = (text_width / width).min(240. / height).min(1.);
+        Ok((
+            DrawKind::Pdf {
+                asset: Box::new(pdf),
+                draw_width: width * scale,
+                draw_height: height * scale,
+            },
+            width * scale,
+            height * scale,
+        ))
+    }
+    /// Vector figures require the `pdf-import` feature (implied by `svg`).
+    #[cfg(not(feature = "pdf-import"))]
+    fn vector_figure(
+        path: &std::path::Path,
+        fonts: &Fonts,
+        text_width: f32,
+        is_svg: bool,
+    ) -> Result<(DrawKind, f32, f32)> {
+        let _ = (path, fonts, text_width, is_svg);
+        Err(Diagnostic::new(
+            "asset-support",
+            "PDF and SVG figures are disabled in this build; rebuild with the `pdf-import` feature.",
+        ))
+    }
+    /// Size and embed a raster PNG or JPEG figure.
+    #[cfg(feature = "raster")]
+    fn raster_figure(
+        path: &std::path::Path,
+        fonts: &Fonts,
+        text_width: f32,
+    ) -> Result<(DrawKind, f32, f32)> {
+        let img = crate::assets::raster(path, fonts)?;
+        let w = img.width();
+        let h = img.height();
+        let scale = (text_width / w as f32).min(240. / h as f32).min(1.);
+        let dw = w as f32 * scale;
+        let dh = h as f32 * scale;
+        let rgba = img.to_rgba8();
+        let alpha = if rgba.pixels().any(|p| p[3] != 255) {
+            Some(rgba.pixels().map(|p| p[3]).collect())
+        } else {
+            None
+        };
+        Ok((
+            DrawKind::Image {
+                pixels: img.to_rgb8().into_raw(),
+                alpha,
+                width: w,
+                height: h,
+                draw_width: dw,
+                draw_height: dh,
+            },
+            dw,
+            dh,
+        ))
+    }
+    /// Raster figures require the `raster` feature.
+    #[cfg(not(feature = "raster"))]
+    fn raster_figure(
+        path: &std::path::Path,
+        fonts: &Fonts,
+        text_width: f32,
+    ) -> Result<(DrawKind, f32, f32)> {
+        let _ = (path, fonts, text_width);
+        Err(Diagnostic::new(
+            "asset-support",
+            "Raster figures are disabled in this build; rebuild with the `raster` feature.",
+        ))
     }
     fn x(&self) -> f32 {
         self.left[self.active_page % 2] + (self.width() + self.gutter) * self.column as f32
@@ -1068,53 +1165,17 @@ impl Builder<'_> {
                     .and_then(|s| s.to_str())
                     .is_some_and(|s| s.eq_ignore_ascii_case("pdf") || s.eq_ignore_ascii_case("svg"))
                 {
-                    let pdf = if asset
-                        .path
-                        .extension()
-                        .and_then(|s| s.to_str())
-                        .is_some_and(|s| s.eq_ignore_ascii_case("svg"))
-                    {
-                        crate::assets::PdfAsset::from_svg(&asset.path, &self.output.fonts)?
-                    } else {
-                        crate::assets::PdfAsset::load(&asset.path)?
-                    };
-                    let width = pdf.bbox[2] - pdf.bbox[0];
-                    let height = pdf.bbox[3] - pdf.bbox[1];
-                    let scale = (self.width() / width).min(240. / height).min(1.);
-                    (
-                        DrawKind::Pdf {
-                            asset: Box::new(pdf),
-                            draw_width: width * scale,
-                            draw_height: height * scale,
-                        },
-                        width * scale,
-                        height * scale,
-                    )
+                    Self::vector_figure(
+                        &asset.path,
+                        &self.output.fonts,
+                        self.width(),
+                        asset
+                            .path
+                            .extension()
+                            .is_some_and(|s| s.eq_ignore_ascii_case("svg")),
+                    )?
                 } else {
-                    let img = crate::assets::raster(&asset.path, &self.output.fonts)?;
-                    let w = img.width();
-                    let h = img.height();
-                    let scale = (self.width() / w as f32).min(240. / h as f32).min(1.);
-                    let dw = w as f32 * scale;
-                    let dh = h as f32 * scale;
-                    let rgba = img.to_rgba8();
-                    let alpha = if rgba.pixels().any(|p| p[3] != 255) {
-                        Some(rgba.pixels().map(|p| p[3]).collect())
-                    } else {
-                        None
-                    };
-                    (
-                        DrawKind::Image {
-                            pixels: img.to_rgb8().into_raw(),
-                            alpha,
-                            width: w,
-                            height: h,
-                            draw_width: dw,
-                            draw_height: dh,
-                        },
-                        dw,
-                        dh,
-                    )
+                    Self::raster_figure(&asset.path, &self.output.fonts, self.width())?
                 };
                 self.ensure(dh + 48.)?;
                 self.cursor -= dh;
