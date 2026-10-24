@@ -10,7 +10,7 @@ description = "Publisle's bounded native document typesetter"
 [dependencies]
 publisle-math = { path = "../publisle-math", version = "0.1.0" }
 flate2 = "1.1"
-pdf-writer = "0.14"
+pdf-writer = "0.15"
 rustybuzz = "0.20"
 subsetter = "0.2"
 serde = { version = "1.0", features = ["derive"] }
