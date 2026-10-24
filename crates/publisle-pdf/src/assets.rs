@@ -149,7 +149,9 @@ impl PdfAsset {
                 resources.set(key.clone(), value.clone());
             }
         }
-        let bytes = doc.get_page_content(page).map_err(invalid)?;
+        let bytes = doc
+            .get_page_content_with_limit(page, 16 * 1024 * 1024)
+            .map_err(invalid)?;
         if bytes.len() > 16 * 1024 * 1024 {
             return Err(invalid("Decoded PDF figure exceeds 16 MiB."));
         }
