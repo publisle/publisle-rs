@@ -7,6 +7,14 @@ repository.workspace = true
 license.workspace = true
 description = "Publisle's bounded native document typesetter"
 
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/publisle-pdf"
+keywords = ["pdf", "typesetting", "math", "publishing", "tagged-pdf"]
+categories = ["text-processing", "rendering"]
+exclude = ["READINESS.json", "VERIFICATION.md", "reference.json"]
+
 [dependencies]
 publisle-math = { path = "../publisle-math", version = "0.1.0" }
 flate2 = "1.1"
@@ -22,3 +30,6 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 resvg = { version = "0.45", default-features = false, features = ["text"] }
 svg2pdf = { version = "=0.13.0", default-features = false, features = ["text", "filters"] }
 lopdf = { version = "0.46", default-features = false }
+
+[package.metadata.docs.rs]
+all-features = true

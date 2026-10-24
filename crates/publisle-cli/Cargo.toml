@@ -1,0 +1,30 @@
+[package]
+name = "publisle-cli"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+description = "Publisle native PDF and math command line tools"
+documentation = "https://docs.rs/publisle-cli"
+keywords = ["pdf", "typesetting", "math", "cli"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "publisle-rs"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive", "env"] }
+publisle-pdf = { path = "../publisle-pdf", version = "0.3.1" }
+publisle-math = { path = "../publisle-math", version = "0.1.0" }
+serde_json = "1"
+
+[dev-dependencies]
+assert_cmd = "2"
+
+[package.metadata.docs.rs]
+all-features = true

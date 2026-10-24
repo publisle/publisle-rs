@@ -33,15 +33,19 @@ async function walk(directory) {
 await walk("schemas");
 await walk("fixtures");
 await walk("figures");
+await walk("regressions");
 assert.deepEqual(
   paths.sort(),
-  Object.keys(lock.files).sort(),
+  Object.keys({ ...lock.files, ...lock.localFiles }).sort(),
   "Locked file set changed",
 );
-for (const [path, expected] of Object.entries(lock.files)) {
+for (const [path, expected] of Object.entries({
+  ...lock.files,
+  ...lock.localFiles,
+})) {
   assert.match(
     path,
-    /^(schemas|fixtures|figures)\/[a-zA-Z0-9_.-]+\.(json|svg)$/u,
+    /^(schemas|fixtures|figures|regressions)\/[a-zA-Z0-9_.-]+\.(json|svg)$/u,
   );
   const bytes = await readFile(new URL(path, root));
   assert.equal(
@@ -50,7 +54,10 @@ for (const [path, expected] of Object.entries(lock.files)) {
     path,
   );
   if (path.endsWith(".json")) JSON.parse(bytes);
-  if (process.argv.includes("--upstream")) {
+  if (
+    process.argv.includes("--upstream") &&
+    !Object.hasOwn(lock.localFiles ?? {}, path)
+  ) {
     const upstream = path.startsWith("figures/")
       ? `sites/www/public/${path.slice(8)}`
       : `packages/contracts/${path}`;
@@ -68,3 +75,19 @@ for (const [path, expected] of Object.entries(lock.files)) {
   }
 }
 console.log(`Verified ${paths.length} pinned conformance files.`);
+
+assert.deepEqual(
+  await readFile(
+    new URL("../crates/publisle-math/src/regression-math.json", root),
+  ),
+  await readFile(new URL("regressions/math.json", root)),
+  "Published math regression fixture differs from conformance",
+);
+
+assert.deepEqual(
+  await readFile(
+    new URL("../crates/publisle-pdf/src/regression-math.json", root),
+  ),
+  await readFile(new URL("regressions/math.json", root)),
+  "Published PDF regression fixture differs from conformance",
+);
