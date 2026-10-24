@@ -25,7 +25,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - run: rustup show active-toolchain
-      - uses: release-plz/action@v0.5
+      - uses: release-plz/action@7ef5e4d4b0420630cfcaeb182c01e13651d4c577 # v0.5
         with:
           command: release
         env:
@@ -76,6 +76,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 90
   release-pr:
+    # cargo-semver-checks 0.51 requires rustdoc >= 1.93. Engine CI and
+    # publication still use the repository's pinned 1.90 toolchain.
+    env:
+      RUSTUP_TOOLCHAIN: 1.93.0
     needs: validate
     if: github.repository == 'publisle/publisle-rs' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
@@ -88,8 +92,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - run: rustup toolchain install 1.93.0 --profile minimal
       - run: rustup show active-toolchain
-      - uses: release-plz/action@v0.5
+      - uses: release-plz/action@7ef5e4d4b0420630cfcaeb182c01e13651d4c577 # v0.5
         id: release-pr
         with:
           command: release-pr
