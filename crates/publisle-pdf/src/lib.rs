@@ -9,6 +9,7 @@ mod math;
 pub mod model;
 mod pdf;
 mod profiles;
+#[cfg(feature = "svg")]
 mod svg;
 
 /// Compile resolved native input into PDF bytes and a structured report.

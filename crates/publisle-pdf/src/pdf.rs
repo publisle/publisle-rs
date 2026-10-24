@@ -420,6 +420,7 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
                             .stroke();
                     }
                 }
+                #[cfg(feature = "pdf-import")]
                 DrawKind::Pdf {
                     asset,
                     draw_width,
