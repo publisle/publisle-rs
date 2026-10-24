@@ -215,11 +215,16 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
         let bytes = cmap.finish();
         pdf.stream(cmap_id, &bytes);
     }
-    pdf.document_info(info)
-        .title(TextStr(&layout.title))
-        .author(TextStr(&layout.authors))
-        .creator(TextStr("Publisle"))
-        .producer(TextStr(concat!("publisle-pdf ", env!("CARGO_PKG_VERSION"))));
+    {
+        let mut info = pdf.document_info(info);
+        info.title(TextStr(&layout.title))
+            .author(TextStr(&layout.authors))
+            .creator(TextStr("Publisle"))
+            .producer(TextStr(concat!("publisle-pdf ", env!("CARGO_PKG_VERSION"))));
+        if !layout.keywords.is_empty() {
+            info.keywords(TextStr(&layout.keywords.join(", ")));
+        }
+    }
     // This records the requested standard; independent validation is still required.
     let standard_xmp = match standard {
         Some("ua-2") => "<pdfuaid:part>2</pdfuaid:part><pdfuaid:rev>2024</pdfuaid:rev>",
@@ -232,8 +237,23 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
             ));
         }
     };
+    let keywords_xmp = if layout.keywords.is_empty() {
+        String::new()
+    } else {
+        let bag = layout
+            .keywords
+            .iter()
+            .map(|keyword| format!("<rdf:li>{}</rdf:li>", math::xml(keyword)))
+            .collect::<Vec<_>>()
+            .join("");
+        format!(
+            "<dc:subject><rdf:Bag>{bag}</rdf:Bag></dc:subject>\
+             <pdf:Keywords>{}</pdf:Keywords>",
+            math::xml(&layout.keywords.join(", "))
+        )
+    };
     let xmp = format!(
-        "<?xpacket begin=\"\u{feff}\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?><x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"><rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:pdfuaid=\"http://www.aiim.org/pdfua/ns/id/\"><dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">{}</rdf:li></rdf:Alt></dc:title><dc:creator><rdf:Seq><rdf:li>{}</rdf:li></rdf:Seq></dc:creator><dc:language><rdf:Bag><rdf:li>{}</rdf:li></rdf:Bag></dc:language>{standard_xmp}</rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end=\"w\"?>",
+        "<?xpacket begin=\"\u{feff}\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?><x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"><rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\" xmlns:pdfuaid=\"http://www.aiim.org/pdfua/ns/id/\"><dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">{}</rdf:li></rdf:Alt></dc:title><dc:creator><rdf:Seq><rdf:li>{}</rdf:li></rdf:Seq></dc:creator><dc:language><rdf:Bag><rdf:li>{}</rdf:li></rdf:Bag></dc:language>{keywords_xmp}{standard_xmp}</rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end=\"w\"?>",
         math::xml(&layout.title),
         math::xml(&layout.authors),
         math::xml(&layout.language)
