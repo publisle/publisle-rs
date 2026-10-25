@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.5.0...publisle-pdf-v0.5.1) - 2026-10-25
+
+### Fixed
+
+- close the bounded-failure and typography gaps (3, 4, 7, 14, 18) ([#31](https://github.com/publisle/publisle-rs/pull/31))
+
 ## [0.5.0](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.4.0...publisle-pdf-v0.5.0) - 2026-10-24
 
 ### Added
