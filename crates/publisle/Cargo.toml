@@ -1,6 +1,6 @@
 [package]
 name = "publisle"
-version = "0.1.1"
+version = "0.1.2"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -19,7 +19,7 @@ pdf = ["dep:publisle-pdf"]
 math = ["dep:publisle-math"]
 
 [dependencies]
-publisle-pdf = { path = "../publisle-pdf", version = "0.5.0", optional = true }
+publisle-pdf = { path = "../publisle-pdf", version = "0.5.1", optional = true }
 publisle-math = { path = "../publisle-math", version = "0.2.0", optional = true }
 
 [package.metadata.docs.rs]
