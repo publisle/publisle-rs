@@ -1,59 +1,59 @@
 [
-  {
-    "path": "/app/fonts/NotoSerif-Regular.ttf",
-    "role": "regular"
-  },
-  {
-    "path": "/app/fonts/NotoSerif-Bold.ttf",
-    "role": "bold"
-  },
-  {
-    "path": "/app/fonts/NotoSerif-Italic.ttf",
-    "role": "italic"
-  },
-  {
-    "path": "/app/fonts/DejaVuSansMono.ttf",
-    "role": "mono"
-  },
-  {
-    "path": "/app/fonts/DejaVuSans.ttf",
-    "role": "fallback"
-  },
-  {
-    "path": "/app/fonts/NotoNaskhArabic-Regular.ttf",
-    "role": "fallback"
-  },
-  {
-    "path": "/app/fonts/NotoSansCJK-Regular.ttc",
-    "role": "fallback",
-    "index": 2
-  },
-  {
-    "path": "/app/fonts/NotoSerif-BoldItalic.ttf",
-    "role": "fallback"
-  },
-  {
-    "path": "/app/fonts/DejaVuSansMono-Bold.ttf",
-    "role": "mono"
-  },
-  {
-    "path": "/app/fonts/DejaVuSansMono-Oblique.ttf",
-    "role": "mono"
-  },
-  {
-    "path": "/app/fonts/DejaVuSansMono-BoldOblique.ttf",
-    "role": "mono"
-  },
-  {
-    "path": "/app/fonts/DejaVuSans-Bold.ttf",
-    "role": "fallback"
-  },
-  {
-    "path": "/app/fonts/DejaVuSans-Oblique.ttf",
-    "role": "fallback"
-  },
-  {
-    "path": "/app/fonts/DejaVuSans-BoldOblique.ttf",
-    "role": "fallback"
-  }
+ {
+  "path": "/app/fonts/NotoSerif-Regular.ttf",
+  "role": "regular"
+ },
+ {
+  "path": "/app/fonts/NotoSerif-Bold.ttf",
+  "role": "bold"
+ },
+ {
+  "path": "/app/fonts/NotoSerif-Italic.ttf",
+  "role": "italic"
+ },
+ {
+  "path": "/app/fonts/DejaVuSansMono.ttf",
+  "role": "mono"
+ },
+ {
+  "path": "/app/fonts/DejaVuSans.ttf",
+  "role": "fallback"
+ },
+ {
+  "path": "/app/fonts/NotoNaskhArabic-Regular.ttf",
+  "role": "fallback"
+ },
+ {
+  "path": "/app/fonts/NotoSansCJK-Regular.ttc",
+  "role": "fallback",
+  "index": 2
+ },
+ {
+  "path": "/app/fonts/NotoSerif-BoldItalic.ttf",
+  "role": "bold-italic"
+ },
+ {
+  "path": "/app/fonts/DejaVuSansMono-Bold.ttf",
+  "role": "mono"
+ },
+ {
+  "path": "/app/fonts/DejaVuSansMono-Oblique.ttf",
+  "role": "mono"
+ },
+ {
+  "path": "/app/fonts/DejaVuSansMono-BoldOblique.ttf",
+  "role": "mono"
+ },
+ {
+  "path": "/app/fonts/DejaVuSans-Bold.ttf",
+  "role": "fallback"
+ },
+ {
+  "path": "/app/fonts/DejaVuSans-Oblique.ttf",
+  "role": "fallback"
+ },
+ {
+  "path": "/app/fonts/DejaVuSans-BoldOblique.ttf",
+  "role": "fallback"
+ }
 ]

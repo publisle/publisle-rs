@@ -74,7 +74,8 @@ pub fn compile(input: &model::Input) -> model::Result<(Vec<u8>, model::Report)> 
     }
     diagnostics.push(model::Diagnostic::new("native-engine-experimental", "Native layout is experimental; publisher fidelity and PDF/UA conformance require independent validation."));
     let started = std::time::Instant::now();
-    let layout = layout::build(input)?;
+    let (layout, mut layout_warnings) = layout::build(input)?;
+    diagnostics.append(&mut layout_warnings);
     let layout_ms = started.elapsed().as_millis();
     let bytes = pdf::write(&layout, input.pdf_standard.as_deref())?;
     let mut timings = std::collections::BTreeMap::new();

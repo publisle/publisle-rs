@@ -12,6 +12,7 @@ pub struct Layout {
     pub language: String,
     pub title: String,
     pub authors: String,
+    pub keywords: Vec<String>,
 }
 pub struct Page {
     pub width: f32,
@@ -65,8 +66,12 @@ pub enum DrawKind {
 struct Piece {
     kind: PieceKind,
     width: f32,
+    /// Point size the glyphs were shaped and must be drawn at.
+    size: f32,
     ascent: f32,
     descent: f32,
+    /// Baseline offset for superscript runs such as footnote markers.
+    raise: f32,
     break_after: bool,
 }
 enum PieceKind {
@@ -111,8 +116,10 @@ struct Builder<'a> {
     note_placements: Vec<(usize, usize, usize, f32)>,
     scheduled_notes: BTreeSet<usize>,
     rendering_notes: bool,
+    warnings: Vec<Diagnostic>,
+    warned_runs: BTreeSet<String>,
 }
-pub fn build(input: &Input) -> Result<Layout> {
+pub fn build(input: &Input) -> Result<(Layout, Vec<Diagnostic>)> {
     if input.schema_version != 1 {
         return Err(Diagnostic::new(
             "input-version",
@@ -163,6 +170,7 @@ pub fn build(input: &Input) -> Result<Layout> {
             language: input.article.language.clone(),
             title: input.article.title.clone(),
             authors: input.article.authors.join(", "),
+            keywords: input.article.subjects.clone(),
         },
         cursor: page_height - profile.top,
         column: 0,
@@ -192,6 +200,8 @@ pub fn build(input: &Input) -> Result<Layout> {
         note_placements: vec![],
         scheduled_notes: BTreeSet::new(),
         rendering_notes: false,
+        warnings: Vec::new(),
+        warned_runs: BTreeSet::new(),
     };
     builder.index_references();
     builder.new_page()?;
@@ -324,7 +334,8 @@ pub fn build(input: &Input) -> Result<Layout> {
             },
         });
     }
-    Ok(builder.output)
+    let warnings = std::mem::take(&mut builder.warnings);
+    Ok((builder.output, warnings))
 }
 fn plain(value: &str) -> Inline {
     Inline::Text {
@@ -656,25 +667,32 @@ impl Builder<'_> {
     fn pieces(&mut self, inlines: &[Inline], size: f32, role: &str) -> Result<Vec<Piece>> {
         let mut pieces = Vec::new();
         for inline in inlines {
-            let (value, mark, direction, link, target) = match inline {
+            let (value, mark, direction, link, target, superscript) = match inline {
                 Inline::Text {
                     value,
                     mark,
                     direction,
                     reference,
                 } => {
-                    let (value, target) = if let Some(r) = reference {
+                    let (value, target, superscript) = if let Some(r) = reference {
                         let text = self.references.get(&r.target).ok_or_else(|| {
                             Diagnostic::new(
                                 "unresolved-reference",
                                 format!("Unknown {} reference {}.", r.kind, r.target),
                             )
                         })?;
-                        (text.clone(), Some(r.target.clone()))
+                        (text.clone(), Some(r.target.clone()), r.kind == "footnote")
                     } else {
-                        (value.clone(), None)
+                        (value.clone(), None, false)
                     };
-                    (value, mark.as_deref(), direction.as_deref(), None, target)
+                    (
+                        value,
+                        mark.as_deref(),
+                        direction.as_deref(),
+                        None,
+                        target,
+                        superscript,
+                    )
                 }
                 Inline::Link { value, url } => {
                     if !(url.starts_with("https://")
@@ -694,9 +712,9 @@ impl Builder<'_> {
                                 format!("Unknown link target {target}."),
                             ));
                         }
-                        (value.clone(), None, None, None, Some(target.into()))
+                        (value.clone(), None, None, None, Some(target.into()), false)
                     } else {
-                        (value.clone(), None, None, Some(url.clone()), None)
+                        (value.clone(), None, None, Some(url.clone()), None, false)
                     }
                 }
                 Inline::Citation { cluster, text } => {
@@ -714,14 +732,16 @@ impl Builder<'_> {
                         .and_then(|item| item.get("id"))
                         .and_then(serde_json::Value::as_str)
                         .map(|id| format!("bib:{id}"));
-                    (value, None, None, None, target)
+                    (value, None, None, None, target, false)
                 }
                 Inline::Break => {
                     pieces.push(Piece {
                         kind: PieceKind::Break,
                         width: 0.,
+                        size,
                         ascent: size,
                         descent: 0.,
+                        raise: 0.,
                         break_after: true,
                     });
                     continue;
@@ -741,8 +761,10 @@ impl Builder<'_> {
                     );
                     pieces.push(Piece {
                         width: b.width,
+                        size,
                         ascent: b.ascent,
                         descent: b.descent,
+                        raise: 0.,
                         kind: PieceKind::Math(b, xml, value.clone()),
                         break_after: false,
                     });
@@ -752,6 +774,7 @@ impl Builder<'_> {
             let font_role = match mark {
                 Some("strong") => "bold",
                 Some("emphasis") => "italic",
+                Some("bold-italic") => "bold-italic",
                 Some("code") => "mono",
                 _ => role,
             };
@@ -764,11 +787,18 @@ impl Builder<'_> {
                 if word.is_empty() {
                     continue;
                 }
-                let shaped = self.output.fonts.shape(word, size, font_role, rtl)?;
+                // Footnote markers render as linked superscripts, matching the
+                // LaTeX reference output.
+                let superscript = superscript && word.chars().all(|c| c.is_ascii_digit());
+                let word_size = if superscript { size * 0.72 } else { size };
+                let shaped = self.shape_checked(word, word_size, font_role, rtl)?;
+                let raise = if superscript { size * 0.42 } else { 0. };
                 pieces.push(Piece {
                     width: shaped.width,
-                    ascent: size * 0.9,
-                    descent: size * 0.25,
+                    size: word_size,
+                    ascent: word_size * 0.9 + raise,
+                    descent: word_size * 0.25,
+                    raise,
                     kind: PieceKind::Text {
                         shaped,
                         text: word.into(),
@@ -834,12 +864,13 @@ impl Builder<'_> {
                         link,
                         target,
                         strike,
+                        ..
                     } => {
                         if strike {
                             self.draw(
                                 None,
                                 x,
-                                self.cursor + size * 0.3,
+                                self.cursor + size * 0.3 + piece.raise,
                                 DrawKind::Rule {
                                     width: piece.width,
                                     thickness: 0.5,
@@ -851,10 +882,10 @@ impl Builder<'_> {
                         self.draw(
                             Some(text_tag),
                             x,
-                            self.cursor,
+                            self.cursor + piece.raise,
                             DrawKind::Text {
                                 shaped,
-                                size,
+                                size: piece.size,
                                 text,
                                 link,
                                 target,
@@ -873,6 +904,35 @@ impl Builder<'_> {
         }
         self.cursor -= size * 0.45;
         Ok(())
+    }
+    /// Shape a run, degrading unsupported characters to a visible replacement
+    /// glyph with a warning instead of aborting the whole export.
+    fn shape_checked(&mut self, word: &str, size: f32, role: &str, rtl: bool) -> Result<Shaped> {
+        match self.output.fonts.shape(word, size, role, rtl) {
+            Ok(shaped) => Ok(shaped),
+            Err(error) => {
+                if error.code == "missing-glyph" {
+                    let fingerprint =
+                        format!("{role}\0{}", word.chars().take(40).collect::<String>());
+                    if self.warned_runs.insert(fingerprint) {
+                        self.warnings.push(Diagnostic::new(
+                            "missing-glyph",
+                            format!(
+                                "No pinned font covers {:?}; rendered as a replacement glyph.",
+                                word.chars().take(40).collect::<String>()
+                            ),
+                        ));
+                    }
+                    if let Ok(shaped) = self.output.fonts.shape("\u{fffd}", size, role, rtl) {
+                        return Ok(shaped);
+                    }
+                    if let Ok(shaped) = self.output.fonts.shape("\u{fffd}", size, "fallback", rtl) {
+                        return Ok(shaped);
+                    }
+                }
+                Err(error)
+            }
+        }
     }
     fn lines(
         &mut self,
@@ -1041,7 +1101,8 @@ impl Builder<'_> {
             Block::Code { value } => {
                 let tag = self.tag("Code", None, None, None, false);
                 for line in value.lines() {
-                    self.paragraph(&[plain(line)], 8., "mono", tag, 8.)?;
+                    // Tab characters have no pinned glyph; expand to spaces.
+                    self.paragraph(&[plain(&line.replace('\t', "    "))], 8., "mono", tag, 8.)?;
                 }
             }
             Block::Math {
@@ -1239,12 +1300,23 @@ impl Builder<'_> {
                     let mut cells = vec![];
                     let mut notes = BTreeMap::new();
                     for cell in row {
-                        let lines = self.lines(
-                            cell,
-                            9.,
-                            if r < *header_rows { "bold" } else { "regular" },
-                            cell_width - 8.,
-                        )?;
+                        // Wide content scales down to fit, matching the
+                        // reference renderer's narrow-but-complete behaviour.
+                        let mut scale = 1.;
+                        let lines = loop {
+                            match self.lines(
+                                cell,
+                                9. * scale,
+                                if r < *header_rows { "bold" } else { "regular" },
+                                cell_width - 8.,
+                            ) {
+                                Ok(lines) => break lines,
+                                Err(error) if error.code == "layout-overflow" && scale > 0.4 => {
+                                    scale *= 0.8;
+                                }
+                                Err(error) => return Err(error),
+                            }
+                        };
                         let mut cell_height = 8.;
                         for line in &lines {
                             let ascent = line.iter().map(|p| p.ascent).fold(8.1, f32::max);
@@ -1322,10 +1394,10 @@ impl Builder<'_> {
                                         self.draw(
                                             Some(tag),
                                             x,
-                                            y,
+                                            y + piece.raise,
                                             DrawKind::Text {
                                                 shaped,
-                                                size: 9.,
+                                                size: piece.size,
                                                 text,
                                                 link,
                                                 target,
@@ -1593,8 +1665,10 @@ mod bidi_tests {
                 strike: false,
             },
             width: 10.,
+            size: 9.,
             ascent: 8.,
             descent: 2.,
+            raise: 0.,
             break_after: true,
         }
     }
@@ -1605,8 +1679,10 @@ mod bidi_tests {
         let equation = Piece {
             kind: PieceKind::Math(BoxLayout::default(), String::new(), String::new()),
             width: 24.,
+            size: 9.,
             ascent: 8.,
             descent: 2.,
+            raise: 0.,
             break_after: false,
         };
         let mut dot = piece(".");
@@ -1662,7 +1738,7 @@ mod equation_regressions {
         blocks.push(serde_json::json!({"kind":"paragraph","inlines":[{"type":"text","value":"2","reference":{"kind":"cross","target":"eq:second"}}]}));
         blocks.push(serde_json::json!({"kind":"paragraph","inlines":[{"type":"text","value":"A","reference":{"kind":"cross","target":"eq:custom"}}]}));
         let input: Input = serde_json::from_value(serde_json::json!({"schemaVersion":1,"template":"article","templateVersion":"1","article":{"title":"Equations","authors":["Ada"],"blocks":blocks},"citations":[],"bibliography":[],"assets":[],"fonts":[{"path":directory.join("DejaVuSerif.ttf"),"role":"regular"}]})).unwrap();
-        let result = build(&input).unwrap();
+        let (result, _) = build(&input).unwrap();
         let texts: Vec<_> = result
             .pages
             .iter()
@@ -1683,5 +1759,144 @@ mod equation_regressions {
         assert!(!texts.iter().any(|(text, _)| *text == "(4)"));
         assert!(texts.iter().any(|(text, _)| *text == "A"));
         assert!(texts.iter().any(|(text, _)| *text == "2"));
+    }
+}
+
+#[cfg(test)]
+mod gap_regressions {
+    use super::*;
+
+    fn font(directory: &std::path::Path) -> serde_json::Value {
+        serde_json::json!({"path": directory.join("DejaVuSerif.ttf"), "role": "regular"})
+    }
+
+    fn article_input(directory: &std::path::Path, blocks: serde_json::Value) -> Input {
+        serde_json::from_value(serde_json::json!({
+            "schemaVersion": 1,
+            "template": "article",
+            "templateVersion": "1",
+            "article": {
+                "title": "Gap regressions",
+                "authors": ["Ada"],
+                "subjects": ["crisp", "typesetting"],
+                "blocks": blocks
+            },
+            "citations": [],
+            "bibliography": [],
+            "assets": [],
+            "fonts": [font(directory)]
+        }))
+        .unwrap()
+    }
+
+    fn directory() -> std::path::PathBuf {
+        std::path::PathBuf::from(
+            std::env::var_os("PUBLISLE_TEST_FONT_DIR").expect("Pinned fonts required"),
+        )
+    }
+
+    #[test]
+    fn keywords_flow_into_the_layout() {
+        let blocks =
+            serde_json::json!([{"kind":"paragraph","inlines":[{"type":"text","value":"Body."}]}]);
+        let (layout, _) = build(&article_input(&directory(), blocks)).unwrap();
+        assert_eq!(
+            layout.keywords,
+            vec!["crisp".to_string(), "typesetting".to_string()]
+        );
+    }
+
+    #[test]
+    fn footnote_markers_render_as_raised_linked_superscripts() {
+        let blocks = serde_json::json!([
+            {"kind":"paragraph","inlines":[
+                {"type":"text","value":"Claimed"},
+                {"type":"text","value":"1","reference":{"kind":"footnote","target":"n1"}},
+                {"type":"text","value":" elsewhere."}
+            ]},
+            {"kind":"footnote","id":"n1","paragraphs":[[{"type":"text","value":"Source note."}]]}
+        ]);
+        let (layout, _) = build(&article_input(&directory(), blocks)).unwrap();
+        let mut superscript: Option<(f32, f32)> = None;
+        let mut body: Option<(f32, f32)> = None;
+        for draw in &layout.pages[0].draws {
+            if let DrawKind::Text {
+                text, size, target, ..
+            } = &draw.kind
+            {
+                if text == "Claimed" {
+                    body = Some((*size, draw.y));
+                }
+                if text == "1" && target.is_some() {
+                    superscript = Some((*size, draw.y));
+                }
+            }
+        }
+        let (body_size, base) = body.expect("body draw");
+        let (size, y) = superscript.expect("superscript marker draw");
+        assert!(
+            (size - (body_size * 0.72)).abs() < 0.05,
+            "marker size {size} vs body {body_size}"
+        );
+        assert!(y > base, "marker y {y} should sit above baseline {base}");
+    }
+
+    #[test]
+    fn unsupported_characters_warn_instead_of_aborting() {
+        let blocks = serde_json::json!([{"kind":"paragraph","inlines":[
+            {"type":"text","value":"here \u{1f642} now"}
+        ]}]);
+        let input = article_input(&directory(), blocks);
+        let (_, report) = crate::compile(&input).unwrap();
+        assert!(
+            report.diagnostics.iter().any(|d| d.code == "missing-glyph"),
+            "expected a missing-glyph warning: {:?}",
+            report.diagnostics
+        );
+    }
+
+    #[test]
+    fn tabs_in_code_blocks_expand_to_spaces() {
+        let blocks = serde_json::json!([{"kind":"code","value":"a\tb"}]);
+        let (layout, _) = build(&article_input(&directory(), blocks)).unwrap();
+        let texts: Vec<&str> = layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.draws)
+            .filter_map(|draw| match &draw.kind {
+                DrawKind::Text { text, .. } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            texts
+                .iter()
+                .any(|text| text.starts_with('a') && text.trim_end() != *text),
+            "expected the tab expanded to spaces in {texts:?}"
+        );
+    }
+
+    #[test]
+    fn wide_table_cells_scale_instead_of_aborting() {
+        let long = "unbreakable".repeat(12);
+        let blocks = serde_json::json!([{"kind":"table","headerRows":1,"rows":[
+            [[{"type":"text","value":"header"}]],
+            [[{"type":"text","value":long}]]
+        ]}]);
+        let (layout, _) = build(&article_input(&directory(), blocks)).unwrap();
+        let sizes: Vec<f32> = layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.draws)
+            .filter_map(|draw| match &draw.kind {
+                DrawKind::Text { size, text, .. } if text.contains("unbreakable") => Some(*size),
+                _ => None,
+            })
+            .collect();
+        assert!(!sizes.is_empty(), "cell text missing");
+        assert!(
+            sizes.iter().all(|size| *size < 9.),
+            "expected the cell to shrink below 9pt, got {sizes:?}"
+        );
     }
 }
