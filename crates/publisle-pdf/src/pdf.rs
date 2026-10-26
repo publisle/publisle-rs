@@ -73,6 +73,100 @@ fn structure_role(role: &str, ua1: bool) -> &str {
     }
 }
 
+// Resolve destinations from final draws, after pagination and column layout.
+// Children such as links, formulae and bidi spans belong to their heading.
+fn write_outlines(pdf: &mut Pdf, ids: &mut Ids, layout: &Layout, pages: &[Ref]) -> Option<Ref> {
+    let mut destinations = BTreeMap::new();
+    for (page, content) in layout.pages.iter().enumerate() {
+        for draw in &content.draws {
+            let mut tag = draw.tag;
+            while let Some(index) = tag {
+                if layout.tags[index].outline.is_some() {
+                    destinations.entry(index).or_insert((page, draw.y));
+                    break;
+                }
+                tag = layout.tags[index].parent;
+            }
+        }
+    }
+    let entries: Vec<_> = layout
+        .tags
+        .iter()
+        .enumerate()
+        .filter_map(|(tag, value)| {
+            let (depth, title) = value.outline.as_ref()?;
+            let &(page, y) = destinations.get(&tag)?;
+            Some((*depth, title, page, y))
+        })
+        .collect();
+    if entries.is_empty() {
+        return None;
+    }
+    let root = ids.next();
+    let refs: Vec<_> = entries.iter().map(|_| ids.next()).collect();
+    let mut children = vec![Vec::new(); entries.len() + 1];
+    let mut parents = vec![entries.len(); entries.len()];
+    let mut stack: Vec<usize> = Vec::new();
+    for (index, (depth, ..)) in entries.iter().enumerate() {
+        while stack
+            .last()
+            .is_some_and(|&parent| entries[parent].0 >= *depth)
+        {
+            stack.pop();
+        }
+        let parent = stack.last().copied().unwrap_or(entries.len());
+        parents[index] = parent;
+        children[parent].push(index);
+        stack.push(index);
+    }
+    let mut descendants = vec![0i32; entries.len() + 1];
+    for index in (0..entries.len()).rev() {
+        descendants[parents[index]] += descendants[index] + 1;
+    }
+    pdf.indirect(root)
+        .dict()
+        .pair(Name(b"Type"), Name(b"Outlines"))
+        .pair(Name(b"First"), refs[children[entries.len()][0]])
+        .pair(
+            Name(b"Last"),
+            refs[*children[entries.len()].last().unwrap()],
+        )
+        .pair(Name(b"Count"), descendants[entries.len()]);
+    for siblings in &children {
+        for (position, &index) in siblings.iter().enumerate() {
+            let (_, title, page, y) = entries[index];
+            let mut item = pdf.indirect(refs[index]).dict();
+            item.pair(Name(b"Title"), TextStr(title)).pair(
+                Name(b"Parent"),
+                if parents[index] == entries.len() {
+                    root
+                } else {
+                    refs[parents[index]]
+                },
+            );
+            if position > 0 {
+                item.pair(Name(b"Prev"), refs[siblings[position - 1]]);
+            }
+            if position + 1 < siblings.len() {
+                item.pair(Name(b"Next"), refs[siblings[position + 1]]);
+            }
+            if let (Some(first), Some(last)) = (children[index].first(), children[index].last()) {
+                item.pair(Name(b"First"), refs[*first])
+                    .pair(Name(b"Last"), refs[*last])
+                    .pair(Name(b"Count"), descendants[index]);
+            }
+            item.insert(Name(b"Dest"))
+                .array()
+                .item(pages[page])
+                .item(Name(b"XYZ"))
+                .item(pdf_writer::Null)
+                .item(y)
+                .item(pdf_writer::Null);
+        }
+    }
+    Some(root)
+}
+
 pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
     let mut pdf = Pdf::new();
     let ua1 = standard == Some("ua-1");
@@ -710,12 +804,17 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
     pdf.pages(page_tree)
         .kids(page_ids.iter().copied())
         .count(page_ids.len() as i32);
+    let outlines = write_outlines(&mut pdf, &mut ids, layout, &page_ids);
     {
         let mut root = pdf.catalog(catalog);
         root.pages(page_tree)
             .lang(TextStr(&layout.language))
             .metadata(metadata);
         root.pair(Name(b"StructTreeRoot"), structure);
+        if let Some(outlines) = outlines {
+            root.pair(Name(b"Outlines"), outlines)
+                .pair(Name(b"PageMode"), Name(b"UseOutlines"));
+        }
         root.mark_info().marked(true);
         root.viewer_preferences().display_doc_title(true);
         if !math_files.is_empty() {

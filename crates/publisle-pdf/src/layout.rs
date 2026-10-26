@@ -20,6 +20,7 @@ pub struct Page {
     pub draws: Vec<Draw>,
 }
 pub struct Tag {
+    pub outline: Option<(usize, String)>,
     pub role: String,
     pub parent: Option<usize>,
     pub children: Vec<usize>,
@@ -371,6 +372,7 @@ impl Builder<'_> {
     ) -> usize {
         let id = self.output.tags.len();
         self.output.tags.push(Tag {
+            outline: None,
             role: role.into(),
             parent,
             children: vec![],
@@ -1127,6 +1129,25 @@ impl Builder<'_> {
                     false,
                 );
                 self.output.tags[tag].label = label.clone();
+                let mut citation = self.citation_cursor;
+                self.output.tags[tag].outline = Some((
+                    if *r#abstract { 0 } else { depth },
+                    title
+                        .iter()
+                        .map(|inline| match inline {
+                            Inline::Text { value, .. }
+                            | Inline::Math { value }
+                            | Inline::Link { value, .. } => value.as_str(),
+                            Inline::Citation { text, .. } => {
+                                let value =
+                                    text.as_ref().or_else(|| self.input.citations.get(citation));
+                                citation += 1;
+                                value.map(String::as_str).unwrap_or("")
+                            }
+                            Inline::Break => " ",
+                        })
+                        .collect::<String>(),
+                ));
                 self.cursor -= 6.;
                 let ieee = self.input.template == "ieee-journal" && !r#abstract;
                 self.centered =
@@ -2024,6 +2045,88 @@ mod equation_regressions {
 #[cfg(test)]
 mod gap_regressions {
     use super::*;
+
+    #[cfg(feature = "pdf-import")]
+    #[test]
+    fn heading_bookmarks_preserve_hierarchy_titles_and_page_destinations() {
+        let heading = |level, text: &str| {
+            serde_json::json!({
+                "kind":"heading", "level":level, "inlines":[{"type":"text","value":text}]
+            })
+        };
+        let mut blocks = vec![heading(1, "First"), heading(3, "Skipped level")];
+        for _ in 0..90 {
+            blocks.push(serde_json::json!({"kind":"paragraph","inlines":[{"type":"text","value":"A paragraph to force pagination."}]}));
+        }
+        blocks.push(heading(1, "Later"));
+        let input = article_input(&directory(), serde_json::json!(blocks));
+        let (bytes, _) = crate::compile(&input).unwrap();
+        let doc = lopdf::Document::load_mem(&bytes).unwrap();
+        let dict = |id| doc.get_object(id).unwrap().as_dict().unwrap();
+        let root = dict(doc.trailer.get(b"Root").unwrap().as_reference().unwrap());
+        assert_eq!(
+            root.get(b"PageMode").unwrap().as_name().unwrap(),
+            b"UseOutlines"
+        );
+        let outline_id = root.get(b"Outlines").unwrap().as_reference().unwrap();
+        let outline = dict(outline_id);
+        assert_eq!(outline.get(b"Count").unwrap().as_i64().unwrap(), 3);
+        let first_id = outline.get(b"First").unwrap().as_reference().unwrap();
+        let first = dict(first_id);
+        assert_eq!(
+            first.get(b"Parent").unwrap().as_reference().unwrap(),
+            outline_id
+        );
+        let child_id = first.get(b"First").unwrap().as_reference().unwrap();
+        let child = dict(child_id);
+        assert_eq!(
+            child.get(b"Parent").unwrap().as_reference().unwrap(),
+            first_id
+        );
+        let last_id = outline.get(b"Last").unwrap().as_reference().unwrap();
+        let last = dict(last_id);
+        assert_eq!(first.get(b"Next").unwrap().as_reference().unwrap(), last_id);
+        assert_eq!(last.get(b"Prev").unwrap().as_reference().unwrap(), first_id);
+        for (item, title) in [
+            (first, "1 First"),
+            (child, "1.0.1 Skipped level"),
+            (last, "2 Later"),
+        ] {
+            let actual = item.get(b"Title").unwrap().as_str().unwrap();
+            // pdf-writer emits ASCII PDF strings for these titles.
+            assert_eq!(actual, title.as_bytes());
+            let dest = item.get(b"Dest").unwrap().as_array().unwrap();
+            assert_eq!(dest[1].as_name().unwrap(), b"XYZ");
+            assert!(
+                doc.get_pages()
+                    .values()
+                    .any(|id| *id == dest[0].as_reference().unwrap())
+            );
+        }
+        let first_dest = first.get(b"Dest").unwrap().as_array().unwrap();
+        let last_dest = last.get(b"Dest").unwrap().as_array().unwrap();
+        assert_ne!(first_dest[0], last_dest[0]);
+    }
+
+    #[cfg(feature = "pdf-import")]
+    #[test]
+    fn documents_without_headings_have_no_outline() {
+        let input = article_input(
+            &directory(),
+            serde_json::json!([
+                {"kind":"paragraph","inlines":[{"type":"text","value":"Body only."}]}
+            ]),
+        );
+        let (bytes, _) = crate::compile(&input).unwrap();
+        let doc = lopdf::Document::load_mem(&bytes).unwrap();
+        let root = doc
+            .get_object(doc.trailer.get(b"Root").unwrap().as_reference().unwrap())
+            .unwrap()
+            .as_dict()
+            .unwrap();
+        assert!(root.get(b"Outlines").is_err());
+        assert!(root.get(b"PageMode").is_err());
+    }
 
     fn font(directory: &std::path::Path) -> serde_json::Value {
         serde_json::json!({"path": directory.join("DejaVuSerif.ttf"), "role": "regular"})
