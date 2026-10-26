@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.6.0...publisle-pdf-v0.6.1) - 2026-10-26
+
+### Fixed
+
+- *(pdf)* preserve word spacing and frame containment on wrapped code lines ([#36](https://github.com/publisle/publisle-rs/pull/36))
+- *(pdf)* write hierarchical heading bookmarks with final page destinations ([#35](https://github.com/publisle/publisle-rs/pull/35))
+
 ## [0.6.0](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.5.1...publisle-pdf-v0.6.0) - 2026-10-26
 
 ### Added

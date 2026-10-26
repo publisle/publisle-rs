@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/publisle/publisle-rs/compare/publisle-cli-v0.1.3...publisle-cli-v0.1.4) - 2026-10-26
+
+### Other
+
+- updated the following local packages: publisle-pdf
+
 ## [0.1.3](https://github.com/publisle/publisle-rs/compare/publisle-cli-v0.1.2...publisle-cli-v0.1.3) - 2026-10-26
 
 ### Other
