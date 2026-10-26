@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.5.1...publisle-pdf-v0.6.0) - 2026-10-26
+
+### Added
+
+- render nested lists, authored starts, alignment, framed code and front-matter dates (gaps 16, 17, 12) ([#33](https://github.com/publisle/publisle-rs/pull/33))
+
 ## [0.5.1](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.5.0...publisle-pdf-v0.5.1) - 2026-10-25
 
 ### Fixed
