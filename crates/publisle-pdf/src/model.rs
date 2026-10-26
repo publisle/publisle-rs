@@ -35,6 +35,49 @@ pub struct TemplateData {
     pub country: Option<String>,
 }
 
+/// One list item: either flat inline content (compatibility with pinned
+/// inputs) or structured content with nested sub-lists.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
+pub enum ListItem {
+    /// Flat inline content.
+    Inlines(Vec<Inline>),
+    /// Content followed by nested sub-lists.
+    Structured {
+        /// Item content.
+        #[serde(default)]
+        content: Vec<Inline>,
+        /// Nested sub-lists, rendered below the content.
+        #[serde(default)]
+        children: Vec<ListNode>,
+    },
+}
+
+/// A list with its own ordering, start ordinal and items. Block-independent
+/// so list items can nest.
+#[derive(Clone, Debug, Deserialize)]
+pub struct ListNode {
+    /// Ordered.
+    pub ordered: bool,
+    /// First ordinal; defaults to 1.
+    #[serde(default)]
+    pub start: Option<u32>,
+    /// Items.
+    pub items: Vec<ListItem>,
+}
+
+/// Column content alignment inside a table.
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum TableAlign {
+    /// Left.
+    Left,
+    /// Center.
+    Center,
+    /// Right.
+    Right,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Article.
@@ -55,6 +98,9 @@ pub struct Article {
     #[serde(default)]
     /// Direction.
     pub direction: Option<String>,
+    #[serde(default)]
+    /// Authored publication date (ISO-8601), rendered in the front matter.
+    pub date: Option<String>,
     /// Blocks.
     pub blocks: Vec<Block>,
 }
@@ -100,8 +146,11 @@ pub enum Block {
     List {
         /// Ordered.
         ordered: bool,
+        /// First ordinal; defaults to 1.
+        #[serde(default)]
+        start: Option<u32>,
         /// Items.
-        items: Vec<Vec<Inline>>,
+        items: Vec<ListItem>,
     },
     /// Quote.
     Quote {
@@ -112,6 +161,9 @@ pub enum Block {
     Code {
         /// Literal code text.
         value: String,
+        /// Authored language tag, carried for downstream tooling.
+        #[serde(default)]
+        language: Option<String>,
     },
     /// Bounded math syntax tree independent of PDF fonts and layout.
     Math {
@@ -143,6 +195,9 @@ pub enum Block {
         #[serde(default, rename = "headerRows")]
         /// Number of leading header rows.
         header_rows: usize,
+        /// Per-column content alignment; missing columns are left-aligned.
+        #[serde(default)]
+        align: Vec<TableAlign>,
         /// Optional cross-reference label.
         label: Option<String>,
     },

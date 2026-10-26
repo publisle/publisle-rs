@@ -51,14 +51,37 @@ pub fn compile(input: &model::Input) -> model::Result<(Vec<u8>, model::Report)> 
             | Block::Paragraph {
                 inlines: values, ..
             } => inlines(values, index, &mut diagnostics)?,
-            Block::List { items, .. }
-            | Block::Quote { paragraphs: items }
+            Block::Quote { paragraphs: items }
             | Block::Footnote {
                 paragraphs: items, ..
             } => {
                 for values in items {
                     inlines(values, index, &mut diagnostics)?;
                 }
+            }
+            Block::List { items, .. } => {
+                fn list_inlines(
+                    items: &[model::ListItem],
+                    index: usize,
+                    diagnostics: &mut Vec<model::Diagnostic>,
+                ) -> model::Result<()> {
+                    for item in items {
+                        let (content, children) = match item {
+                            model::ListItem::Inlines(inlines) => (inlines, None),
+                            model::ListItem::Structured { content, children } => {
+                                (content, Some(children))
+                            }
+                        };
+                        inlines(content, index, diagnostics)?;
+                        if let Some(children) = children {
+                            for child in children {
+                                list_inlines(&child.items, index, diagnostics)?;
+                            }
+                        }
+                    }
+                    Ok(())
+                }
+                list_inlines(items, index, &mut diagnostics)?;
             }
             Block::Figure { caption, .. } => inlines(caption, index, &mut diagnostics)?,
             Block::Table { rows, caption, .. } => {

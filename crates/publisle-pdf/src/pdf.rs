@@ -472,6 +472,19 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
                         .line_to(draw.x + width, draw.y)
                         .stroke();
                 }
+                DrawKind::Rect { width, height } => {
+                    // Light frame: subtle fill plus a hairline border.
+                    content
+                        .save_state()
+                        .set_fill_rgb(0.965, 0.965, 0.965)
+                        .rect(draw.x, draw.y, *width, *height)
+                        .fill_nonzero()
+                        .set_stroke_rgb(0.78, 0.78, 0.78)
+                        .set_line_width(0.5)
+                        .rect(draw.x, draw.y, *width, *height)
+                        .stroke()
+                        .restore_state();
+                }
                 DrawKind::Image {
                     pixels,
                     alpha,
