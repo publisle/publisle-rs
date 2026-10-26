@@ -1,5 +1,21 @@
 # Native PDF rollout evidence — 22 October 2026
 
+## Local heading outline verification — 26 October 2026
+
+Issue #8 was reproduced against main at `24c745e`: MuPDF reported no outline
+for a six-page article with three headings. With the heading outline change,
+`mutool show OUTPUT.pdf outline` reports `1 Introduction` and its child
+`1.0.1 Nested detail` on page 1, and `2 Conclusion` on page 6. Both PDFs use
+the same resolved input and DejaVu 2.37 fonts. Poppler reads the candidate as
+a six-page tagged PDF 2.0.
+
+Regression tests independently parse the generated PDF with lopdf and verify
+numbered titles, parent/child and sibling links, skipped heading levels, real
+page destinations after pagination, and omission of outlines for documents
+without headings. The workspace suite (43 tests including doctests), Clippy
+with warnings denied, formatting, and all 46 pinned conformance files pass.
+This local check does not change hosted rollout or PDF/UA readiness gates.
+
 ## Current replacement candidate
 
 Release readiness requires standards compliance, complete feature support and
