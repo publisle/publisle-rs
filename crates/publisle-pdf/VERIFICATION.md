@@ -85,3 +85,23 @@ Reproduce compiler and container validation using [README.md](README.md) and the
 A different compiler/font image requires a new verification record. Publisher
 approval and universal reader compatibility are not inferred from validator
 results.
+
+
+## Local code continuation verification — 26 October 2026
+
+Issue #12's blank lines, framing and language projection shipped in Rust #33
+and TypeScript #128. A follow-up reproduction found that every piece on a
+wrapped line gained 12 pt of width in addition to the line's 12 pt indent.
+With a 50-token monospace fixture, Poppler measured normal spaces at 4.816 pt
+and continuation spaces at 16.816 pt; the rightmost token reached x=529.26 pt,
+outside the code frame. Applying the indent once at the line origin retains
+4.816 pt spaces on both lines and keeps the rightmost token at x=445.26 pt.
+
+The new wrapping regression fails on unchanged main and passes with the fix.
+It checks that all 50 tokens survive, continuations have one hanging indent,
+shaped word spacing is unchanged, and every token remains inside its frame.
+All 42 workspace tests including doctests, Clippy with warnings denied,
+formatting and 46 pinned conformance files pass. Independent Poppler extraction
+and a rendered page confirm the blank line, separate frames, indentation and
+complete source text. This local evidence does not change hosted or PDF/UA
+readiness gates.
