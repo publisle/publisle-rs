@@ -54,6 +54,11 @@ pub enum DrawKind {
         width: f32,
         thickness: f32,
     },
+    /// Filled background rectangle (code block frames).
+    Rect {
+        width: f32,
+        height: f32,
+    },
     Image {
         pixels: Vec<u8>,
         alpha: Option<Vec<u8>>,
@@ -224,6 +229,16 @@ pub fn build(input: &Input) -> Result<(Layout, Vec<Diagnostic>)> {
         authors_tag,
         0.,
     )?;
+    if let Some(date) = &input.article.date {
+        let tag = builder.tag("P", None, None, None, false);
+        builder.paragraph(
+            &[plain(&format_long_date(date, &input.article.language))],
+            10.,
+            "regular",
+            tag,
+            0.,
+        )?;
+    }
     for author in &input.article.author_details {
         if let Some(affiliation) = &author.affiliation {
             let tag = builder.tag("P", None, None, None, false);
@@ -632,9 +647,7 @@ impl Builder<'_> {
                     note_order(inlines, &notes, &mut seen, &mut order)
                 }
                 Block::List { items, .. } => {
-                    for p in items {
-                        note_order(p, &notes, &mut seen, &mut order);
-                    }
+                    note_list_items(items, &notes, &mut seen, &mut order, 0);
                 }
                 Block::Quote { paragraphs } => {
                     for p in paragraphs {
@@ -813,6 +826,51 @@ impl Builder<'_> {
         }
         Ok(pieces)
     }
+    /// Indentation width for a list nesting depth.
+    fn indent_width(depth: usize) -> f32 {
+        10. + depth as f32 * 14.
+    }
+    /// Width reserved for the list marker (hanging indent).
+    fn marker_width(ordered: bool) -> f32 {
+        if ordered { 16. } else { 12. }
+    }
+    /// Render a list and its nested sub-lists with hanging markers.
+    fn render_list(
+        &mut self,
+        ordered: bool,
+        start: Option<u32>,
+        items: &[ListItem],
+        depth: usize,
+        parent: usize,
+    ) -> Result<()> {
+        let list = self.tag("L", Some(parent), None, None, false);
+        let first = Self::indent_width(depth);
+        let rest = first + Self::marker_width(ordered);
+        let mut ordinal = start.unwrap_or(1);
+        for item in items {
+            let li = self.tag("LI", Some(list), None, None, false);
+            let body = self.tag("LBody", Some(li), None, None, false);
+            let (content, children): (&[Inline], Option<&Vec<ListNode>>) = match item {
+                ListItem::Inlines(inlines) => (inlines, None),
+                ListItem::Structured { content, children } => (content, Some(children)),
+            };
+            let marker = if ordered {
+                format!("{ordinal}. ")
+            } else {
+                "\u{2022} ".to_string()
+            };
+            ordinal = ordinal.saturating_add(1);
+            let mut line = vec![plain(&marker)];
+            line.extend(content.iter().cloned());
+            self.paragraph_hanging(&line, self.body_size, "regular", body, first, rest)?;
+            if let Some(children) = children {
+                for child in children {
+                    self.render_list(child.ordered, child.start, &child.items, depth + 1, body)?;
+                }
+            }
+        }
+        Ok(())
+    }
     fn paragraph(
         &mut self,
         inlines: &[Inline],
@@ -821,9 +879,27 @@ impl Builder<'_> {
         tag: usize,
         indent: f32,
     ) -> Result<()> {
-        let width = self.width() - indent;
+        self.paragraph_hanging(inlines, size, role, tag, indent, indent)
+    }
+    /// Lay out with a distinct first-line indent so list and code items keep
+    /// their marker or padding on wrapped continuation lines.
+    fn paragraph_hanging(
+        &mut self,
+        inlines: &[Inline],
+        size: f32,
+        role: &str,
+        tag: usize,
+        first_indent: f32,
+        rest_indent: f32,
+    ) -> Result<()> {
+        let width = self.width() - first_indent.max(rest_indent);
         let lines = self.lines(inlines, size, role, width)?;
-        for line in lines {
+        for (line_index, line) in lines.into_iter().enumerate() {
+            let indent = if line_index == 0 {
+                first_indent
+            } else {
+                rest_indent
+            };
             let ascent = line.iter().map(|p| p.ascent).fold(size * 0.9, f32::max);
             let descent = line.iter().map(|p| p.descent).fold(size * 0.25, f32::max);
             let height = (ascent + descent).max(size * self.leading);
@@ -844,17 +920,18 @@ impl Builder<'_> {
             }
             self.cursor -= ascent;
             let used = line.iter().map(|p| p.width).sum::<f32>();
+            let available = width - indent;
             let positions = visual_positions(
                 &line,
                 self.rtl(),
                 self.x()
                     + indent
                     + if self.centered {
-                        (width - used) / 2.
+                        (available - used) / 2.
                     } else {
                         0.
                     },
-                if self.centered { used } else { width },
+                if self.centered { used } else { available },
             );
             for (piece, x) in line.into_iter().zip(positions) {
                 match piece.kind {
@@ -1077,19 +1154,13 @@ impl Builder<'_> {
                 let tag = self.tag("P", None, None, None, false);
                 self.paragraph(inlines, self.body_size, "regular", tag, 0.)?;
             }
-            Block::List { ordered, items } => {
+            Block::List {
+                ordered,
+                start,
+                items,
+            } => {
                 let list = self.tag("L", None, None, None, false);
-                for (i, item) in items.iter().enumerate() {
-                    let li = self.tag("LI", Some(list), None, None, false);
-                    let body = self.tag("LBody", Some(li), None, None, false);
-                    let mut content = vec![plain(&if *ordered {
-                        format!("{}. ", i + 1)
-                    } else {
-                        "• ".into()
-                    })];
-                    content.extend(item.iter().cloned());
-                    self.paragraph(&content, self.body_size, "regular", body, 10.)?;
-                }
+                self.render_list(*ordered, *start, items, 0, list)?;
             }
             Block::Quote { paragraphs } => {
                 let quote = self.tag("BlockQuote", None, None, None, false);
@@ -1098,12 +1169,85 @@ impl Builder<'_> {
                     self.paragraph(paragraph, self.body_size, "italic", tag, 14.)?;
                 }
             }
-            Block::Code { value } => {
-                let tag = self.tag("Code", None, None, None, false);
+            Block::Code { value, .. } => {
+                // Lay every source line out first so the frame can be sized,
+                // then paint background, border and text in that order.
+                let content_width = self.width() - 18.;
+                let mut visual: Vec<(Vec<Piece>, bool)> = Vec::new();
                 for line in value.lines() {
                     // Tab characters have no pinned glyph; expand to spaces.
-                    self.paragraph(&[plain(&line.replace('\t', "    "))], 8., "mono", tag, 8.)?;
+                    let expanded = line.replace('\t', "    ");
+                    let text = plain(if expanded.is_empty() { " " } else { &expanded });
+                    let wrapped = self.lines(&[text], 8., "mono", content_width - 12.)?;
+                    let empty = wrapped.is_empty();
+                    for (index, mut line) in wrapped.into_iter().enumerate() {
+                        // Wrapped continuations keep a hanging indent.
+                        let continuation = index > 0;
+                        if continuation {
+                            for piece in &mut line {
+                                piece.width += 12.;
+                            }
+                        }
+                        visual.push((line, continuation));
+                    }
+                    if empty {
+                        visual.push((vec![], false));
+                    }
                 }
+                let line_height = 8. * self.leading;
+                let height = 8. + visual.len() as f32 * line_height + 8.;
+                self.ensure(height)?;
+                let top = self.cursor;
+                self.draw(
+                    None,
+                    self.x(),
+                    top - height,
+                    DrawKind::Rect {
+                        width: self.width(),
+                        height,
+                    },
+                );
+                self.cursor -= 4.;
+                let tag = self.tag("Code", None, None, None, false);
+                for (line, continuation) in &visual {
+                    let ascent = line.iter().map(|p| p.ascent).fold(7.2, f32::max);
+                    let descent = line.iter().map(|p| p.descent).fold(2., f32::max);
+                    self.cursor -= (ascent + descent + 1.8).max(line_height);
+                    let offset = if *continuation { 18. } else { 6. };
+                    let positions = visual_positions(
+                        line,
+                        self.rtl(),
+                        self.x() + 6. + offset,
+                        content_width - offset,
+                    );
+                    for (piece, x) in line.iter().zip(positions) {
+                        if let PieceKind::Text {
+                            shaped,
+                            text,
+                            link,
+                            target,
+                            ..
+                        } = &piece.kind
+                        {
+                            let text_tag =
+                                self.text_tag(tag, text, link.is_some() || target.is_some());
+                            self.draw(
+                                Some(text_tag),
+                                x,
+                                self.cursor,
+                                DrawKind::Text {
+                                    shaped: shaped.clone(),
+                                    size: piece.size,
+                                    text: text.clone(),
+                                    link: link.clone(),
+                                    target: target.clone(),
+                                },
+                            );
+                        }
+                    }
+                }
+                self.cursor = top - height + 4.;
+                self.cursor -= 6.;
             }
             Block::Math {
                 value,
@@ -1257,12 +1401,21 @@ impl Builder<'_> {
                     self.figures
                 ))];
                 text.extend(caption.iter().cloned());
+                // Short captions centre under the figure; long ones wrap left.
+                let fits = self
+                    .lines(&text, 9., "regular", self.width())
+                    .map(|lines| lines.len() == 1)
+                    .unwrap_or(false);
+                let centered = self.centered;
+                self.centered = fits;
                 self.paragraph(&text, 9., "regular", tag, 0.)?;
+                self.centered = centered;
             }
             Block::Table {
                 rows,
                 caption,
                 header_rows,
+                align,
                 label,
             } => {
                 let _ = label;
@@ -1277,7 +1430,14 @@ impl Builder<'_> {
                     self.tables
                 ))];
                 text.extend(caption.iter().cloned());
+                let fits = self
+                    .lines(&text, 9., "regular", self.width())
+                    .map(|lines| lines.len() == 1)
+                    .unwrap_or(false);
+                let centered = self.centered;
+                self.centered = fits;
                 self.paragraph(&text, 9., "regular", tag, 0.)?;
+                self.centered = centered;
                 let cols = rows.first().map(Vec::len).unwrap_or(0);
                 if cols == 0 || rows.iter().any(|r| r.len() != cols) {
                     return Err(Diagnostic::new(
@@ -1359,7 +1519,27 @@ impl Builder<'_> {
                             header,
                         );
                         let col = if rtl { cols - 1 - c } else { c };
-                        let left = x0 + col as f32 * cell_width + 4.;
+                        let column_align = align.get(col).copied();
+                        let left = x0
+                            + col as f32 * cell_width
+                            + 4.
+                            + match column_align {
+                                Some(TableAlign::Center) => {
+                                    let used = lines
+                                        .iter()
+                                        .map(|line| line.iter().map(|p| p.width).sum::<f32>())
+                                        .fold(0., f32::max);
+                                    ((cell_width - 8. - used) / 2.).max(0.)
+                                }
+                                Some(TableAlign::Right) => {
+                                    let used = lines
+                                        .iter()
+                                        .map(|line| line.iter().map(|p| p.width).sum::<f32>())
+                                        .fold(0., f32::max);
+                                    (cell_width - 8. - used).max(0.)
+                                }
+                                _ => 0.,
+                            };
                         let mut y = top - 4.;
                         for line in lines {
                             let ascent = line.iter().map(|p| p.ascent).fold(8.1, f32::max);
@@ -1624,6 +1804,85 @@ fn alphabetic(mut n: u32) -> String {
     }
     text.into_iter().rev().collect()
 }
+/// Format an ISO date (or date-time) as a long date in the article language.
+fn format_long_date(date: &str, language: &str) -> String {
+    let day_part = date.get(0..10).unwrap_or(date);
+    let parts: Vec<&str> = day_part.split('-').collect();
+    let (year, month, day) = match parts.as_slice() {
+        [year, month, day] if year.len() == 4 && month.len() == 2 && day.len() == 2 => {
+            match (
+                year.parse::<u32>(),
+                month.parse::<u32>(),
+                day.parse::<u32>(),
+            ) {
+                (Ok(y), Ok(m), Ok(d)) if (1..=12).contains(&m) && (1..=31).contains(&d) => {
+                    (y, m, d)
+                }
+                _ => return date.to_string(),
+            }
+        }
+        _ => return date.to_string(),
+    };
+    let arabic = language.starts_with("ar");
+    static EN: [&str; 12] = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ];
+    static AR: [&str; 12] = [
+        "\u{64a}\u{646}\u{627}\u{64a}\u{631}",
+        "\u{641}\u{628}\u{631}\u{627}\u{64a}\u{631}",
+        "\u{645}\u{627}\u{631}\u{633}",
+        "\u{623}\u{628}\u{631}\u{64a}\u{644}",
+        "\u{645}\u{627}\u{64a}\u{648}",
+        "\u{64a}\u{648}\u{646}\u{64a}\u{648}",
+        "\u{64a}\u{648}\u{644}\u{64a}\u{648}",
+        "\u{623}\u{63a}\u{634}\u{637}\u{633}",
+        "\u{633}\u{628}\u{62a}\u{645}\u{628}\u{631}",
+        "\u{623}\u{643}\u{62a}\u{648}\u{628}\u{631}",
+        "\u{646}\u{648}\u{641}\u{645}\u{628}\u{631}",
+        "\u{62f}\u{64a}\u{633}\u{645}\u{628}\u{631}",
+    ];
+    if arabic {
+        format!("{day} {} {year}", AR[month as usize - 1])
+    } else {
+        format!("{} {}, {year}", EN[month as usize - 1], day)
+    }
+}
+
+fn note_list_items(
+    items: &[ListItem],
+    notes: &HashMap<&str, &[Vec<Inline>]>,
+    seen: &mut BTreeSet<String>,
+    order: &mut Vec<String>,
+    depth: usize,
+) {
+    if depth > 8 {
+        return;
+    }
+    for item in items {
+        let (content, children) = match item {
+            ListItem::Inlines(inlines) => (inlines, None),
+            ListItem::Structured { content, children } => (content, Some(children)),
+        };
+        note_order(content, notes, seen, order);
+        if let Some(children) = children {
+            for child in children {
+                note_list_items(&child.items, notes, seen, order, depth + 1);
+            }
+        }
+    }
+}
+
 fn note_order(
     inlines: &[Inline],
     notes: &HashMap<&str, &[Vec<Inline>]>,
@@ -1897,6 +2156,130 @@ mod gap_regressions {
         assert!(
             sizes.iter().all(|size| *size < 9.),
             "expected the cell to shrink below 9pt, got {sizes:?}"
+        );
+    }
+
+    #[test]
+    fn ordered_lists_honour_start_and_nested_children() {
+        let blocks = serde_json::json!([
+            {"kind":"list","ordered":true,"start":3,"items":[
+                {"content":[{"type":"text","value":"third"}]},
+                {"content":[{"type":"text","value":"fourth"}],"children":[
+                    {"ordered":false,"items":[{"content":[{"type":"text","value":"nested"}]}]}
+                ]}
+            ]}
+        ]);
+        let (layout, _) = build(&article_input(&directory(), blocks)).unwrap();
+        let texts: Vec<&str> = layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.draws)
+            .filter_map(|draw| match &draw.kind {
+                DrawKind::Text { text, .. } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            texts.iter().any(|text| text.starts_with("3. ")),
+            "expected the authored start ordinal, got {texts:?}"
+        );
+        assert!(
+            texts.iter().any(|text| text.contains("nested")),
+            "expected nested list content, got {texts:?}"
+        );
+    }
+
+    #[test]
+    fn legacy_flat_list_items_still_project() {
+        let blocks = serde_json::json!([{"kind":"list","ordered":false,"items":[
+            [{"type":"text","value":"flat item"}]
+        ]}]);
+        let (layout, _) = build(&article_input(&directory(), blocks)).unwrap();
+        let texts: Vec<&str> = layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.draws)
+            .filter_map(|draw| match &draw.kind {
+                DrawKind::Text { text, .. } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            texts.iter().any(|text| text.contains("flat")),
+            "expected the legacy flat item, got {texts:?}"
+        );
+    }
+
+    #[test]
+    fn code_blocks_preserve_blank_lines_and_draw_a_frame() {
+        let blocks = serde_json::json!([{"kind":"code","value":"first\n\nlast","language":"rust"}]);
+        let (layout, _) = build(&article_input(&directory(), blocks)).unwrap();
+        let mut rects = 0;
+        let mut saw_first = false;
+        let mut saw_last = false;
+        for draw in &layout.pages[0].draws {
+            match &draw.kind {
+                DrawKind::Rect { .. } => rects += 1,
+                DrawKind::Text { text, .. } => {
+                    if text.contains("first") {
+                        saw_first = true;
+                    }
+                    if text.contains("last") {
+                        saw_last = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(rects, 1, "expected exactly one code frame");
+        assert!(saw_first && saw_last, "expected both code lines");
+    }
+
+    #[test]
+    fn authored_dates_render_in_the_front_matter() {
+        let mut input = article_input(
+            &directory(),
+            serde_json::json!([{"kind":"paragraph","inlines":[{"type":"text","value":"Body."}]}]),
+        );
+        input.article.date = Some("2026-10-25".into());
+        let (layout, _) = build(&input).unwrap();
+        let texts: Vec<&str> = layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.draws)
+            .filter_map(|draw| match &draw.kind {
+                DrawKind::Text { text, .. } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        let joined = texts.concat();
+        assert!(
+            joined.contains("October 25, 2026"),
+            "expected a formatted date line, got {joined:?}"
+        );
+    }
+
+    #[test]
+    fn table_columns_align_per_the_authored_alignment() {
+        let blocks = serde_json::json!([{"kind":"table","headerRows":0,"align":["left","right"],"rows":[
+            [[{"type":"text","value":"a"}],[{"type":"text","value":"b"}]]
+        ]}]);
+        let (layout, _) = build(&article_input(&directory(), blocks)).unwrap();
+        let xs: Vec<f32> = layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.draws)
+            .filter_map(|draw| match &draw.kind {
+                DrawKind::Text { text, .. } if text == "b" => Some(draw.x),
+                _ => None,
+            })
+            .collect();
+        let single = xs.first().copied().expect("aligned cell draw");
+        // A right-aligned second column pushes the cell text right of the
+        // left-aligned position (column left edge + 4pt padding).
+        assert!(
+            single > 4. + 1.,
+            "expected right alignment to move the cell, got x={single}"
         );
     }
 }
