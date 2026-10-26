@@ -1,5 +1,17 @@
 # Native PDF rollout evidence — 22 October 2026
 
+## Bookmark structure destinations — 26 October 2026
+
+The published 0.6.1 binary fails veraPDF 1.28.2 PDF/UA-2 rule 8.8 on a
+six-page heading fixture because its bookmarks use page destinations. The
+corrected compiler passes both PDF/UA-1 and PDF/UA-2 validation on the same
+fixture, including linked headings and headings after pagination. PDF 2.0
+bookmarks now use GoTo actions with structure destinations and matching page
+fallbacks; PDF 1.7 retains page destinations. The 45 workspace tests and Clippy
+pass. Native CI now installs the checksum-pinned validator and checks both
+standards before building distributable packages. These regression checks do
+not change hosted rollout readiness or replace the full integration gate.
+
 ## Local heading outline verification — 26 October 2026
 
 Issue #8 was reproduced against main at `24c745e`: MuPDF reported no outline
@@ -85,7 +97,6 @@ Reproduce compiler and container validation using [README.md](README.md) and the
 A different compiler/font image requires a new verification record. Publisher
 approval and universal reader compatibility are not inferred from validator
 results.
-
 
 ## Local code continuation verification — 26 October 2026
 

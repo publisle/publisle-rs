@@ -75,7 +75,14 @@ fn structure_role(role: &str, ua1: bool) -> &str {
 
 // Resolve destinations from final draws, after pagination and column layout.
 // Children such as links, formulae and bidi spans belong to their heading.
-fn write_outlines(pdf: &mut Pdf, ids: &mut Ids, layout: &Layout, pages: &[Ref]) -> Option<Ref> {
+fn write_outlines(
+    pdf: &mut Pdf,
+    ids: &mut Ids,
+    layout: &Layout,
+    pages: &[Ref],
+    tags: &[Ref],
+    ua1: bool,
+) -> Option<Ref> {
     let mut destinations = BTreeMap::new();
     for (page, content) in layout.pages.iter().enumerate() {
         for draw in &content.draws {
@@ -96,7 +103,7 @@ fn write_outlines(pdf: &mut Pdf, ids: &mut Ids, layout: &Layout, pages: &[Ref]) 
         .filter_map(|(tag, value)| {
             let (depth, title) = value.outline.as_ref()?;
             let &(page, y) = destinations.get(&tag)?;
-            Some((*depth, title, page, y))
+            Some((*depth, title, page, y, tag))
         })
         .collect();
     if entries.is_empty() {
@@ -134,7 +141,7 @@ fn write_outlines(pdf: &mut Pdf, ids: &mut Ids, layout: &Layout, pages: &[Ref]) 
         .pair(Name(b"Count"), descendants[entries.len()]);
     for siblings in &children {
         for (position, &index) in siblings.iter().enumerate() {
-            let (_, title, page, y) = entries[index];
+            let (_, title, page, y, tag) = entries[index];
             let mut item = pdf.indirect(refs[index]).dict();
             item.pair(Name(b"Title"), TextStr(title)).pair(
                 Name(b"Parent"),
@@ -155,13 +162,36 @@ fn write_outlines(pdf: &mut Pdf, ids: &mut Ids, layout: &Layout, pages: &[Ref]) 
                     .pair(Name(b"Last"), refs[*last])
                     .pair(Name(b"Count"), descendants[index]);
             }
-            item.insert(Name(b"Dest"))
-                .array()
-                .item(pages[page])
-                .item(Name(b"XYZ"))
-                .item(pdf_writer::Null)
-                .item(y)
-                .item(pdf_writer::Null);
+            item.pair(Name(b"SE"), tags[tag]);
+            if ua1 {
+                item.insert(Name(b"Dest"))
+                    .array()
+                    .item(pages[page])
+                    .item(Name(b"XYZ"))
+                    .item(pdf_writer::Null)
+                    .item(y)
+                    .item(pdf_writer::Null);
+            } else {
+                let mut action = item.insert(Name(b"A")).dict();
+                action.pair(Name(b"S"), Name(b"GoTo"));
+                // PDF 2.0 readers use SD; D preserves navigation in older viewers.
+                action
+                    .insert(Name(b"D"))
+                    .array()
+                    .item(pages[page])
+                    .item(Name(b"XYZ"))
+                    .item(pdf_writer::Null)
+                    .item(y)
+                    .item(pdf_writer::Null);
+                action
+                    .insert(Name(b"SD"))
+                    .array()
+                    .item(tags[tag])
+                    .item(Name(b"XYZ"))
+                    .item(pdf_writer::Null)
+                    .item(y)
+                    .item(pdf_writer::Null);
+            }
         }
     }
     Some(root)
@@ -804,7 +834,7 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
     pdf.pages(page_tree)
         .kids(page_ids.iter().copied())
         .count(page_ids.len() as i32);
-    let outlines = write_outlines(&mut pdf, &mut ids, layout, &page_ids);
+    let outlines = write_outlines(&mut pdf, &mut ids, layout, &page_ids, &tag_ids, ua1);
     {
         let mut root = pdf.catalog(catalog);
         root.pages(page_tree)

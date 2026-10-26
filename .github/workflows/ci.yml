@@ -24,10 +24,15 @@ jobs:
           key: rust-check-1.90-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - run: sudo apt-get update && sudo apt-get install -y fonts-dejavu-core fonts-dejavu-extra
+      - run: sudo apt-get update && sudo apt-get install -y fonts-dejavu-core fonts-dejavu-extra default-jre-headless
       - run: cargo test --workspace --locked
         env:
           PUBLISLE_TEST_FONT_DIR: /usr/share/fonts/truetype/dejavu
+      - name: Validate PDF/UA-1 and PDF/UA-2 heading destinations
+        run: |
+          node tools/install-verapdf.mjs "$RUNNER_TEMP/verapdf"
+          cargo build --locked -p publisle-pdf
+          node tools/check-pdf-ua.mjs target/debug/publisle-pdf "$RUNNER_TEMP/verapdf/verapdf" "$RUNNER_TEMP/pdf-ua" /usr/share/fonts/truetype/dejavu
       - run: node tools/check-conformance.mjs --upstream
       - run: node --test tools/tests/*.test.mjs
   fonts:
