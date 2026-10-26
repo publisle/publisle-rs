@@ -1180,15 +1180,10 @@ impl Builder<'_> {
                     let text = plain(if expanded.is_empty() { " " } else { &expanded });
                     let wrapped = self.lines(&[text], 8., "mono", content_width - 12.)?;
                     let empty = wrapped.is_empty();
-                    for (index, mut line) in wrapped.into_iter().enumerate() {
-                        // Wrapped continuations keep a hanging indent.
-                        let continuation = index > 0;
-                        if continuation {
-                            for piece in &mut line {
-                                piece.width += 12.;
-                            }
-                        }
-                        visual.push((line, continuation));
+                    for (index, line) in wrapped.into_iter().enumerate() {
+                        // Apply the hanging indent to the line origin below;
+                        // shaped advances must retain the source's word spacing.
+                        visual.push((line, index > 0));
                     }
                     if empty {
                         visual.push((vec![], false));
@@ -2208,6 +2203,66 @@ mod gap_regressions {
             texts.iter().any(|text| text.contains("flat")),
             "expected the legacy flat item, got {texts:?}"
         );
+    }
+
+    #[test]
+    fn wrapped_code_indents_once_and_preserves_shaped_word_spacing() {
+        let value = (0..50)
+            .map(|i| format!("token{i:02}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let mut input = article_input(
+            &directory(),
+            serde_json::json!([
+                {"kind":"code","value":value,"language":"typescript"}
+            ]),
+        );
+        input.fonts.push(
+            serde_json::from_value(serde_json::json!({
+                "path":directory().join("DejaVuSansMono.ttf"),"role":"mono"
+            }))
+            .unwrap(),
+        );
+        let (layout, _) = build(&input).unwrap();
+        let page = &layout.pages[0];
+        let words: Vec<_> = page
+            .draws
+            .iter()
+            .filter_map(|draw| match &draw.kind {
+                DrawKind::Text { text, shaped, .. } if text.starts_with("token") => {
+                    Some((draw.x, draw.y, shaped.width))
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(words.len(), 50, "every source token survives wrapping");
+        let continuation = words.iter().find(|word| word.1 < words[0].1).unwrap();
+        assert!(
+            (continuation.0 - words[0].0 - 12.).abs() < 0.05,
+            "continuation has one hanging indent"
+        );
+        let frame_right = page
+            .draws
+            .iter()
+            .find_map(|draw| match draw.kind {
+                DrawKind::Rect { width, .. } => Some(draw.x + width),
+                _ => None,
+            })
+            .unwrap();
+        for word in &words {
+            assert!(
+                word.0 + word.2 <= frame_right,
+                "wrapped code remains inside its frame"
+            );
+        }
+        for pair in words.windows(2) {
+            if pair[0].1 == pair[1].1 {
+                assert!(
+                    (pair[1].0 - pair[0].0 - pair[0].2).abs() < 0.05,
+                    "indent must not add space after each shaped word"
+                );
+            }
+        }
     }
 
     #[test]
