@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.6.1...publisle-pdf-v0.6.2) - 2026-10-26
+
+### Fixed
+
+- target heading structure in PDF 2.0 bookmarks ([#38](https://github.com/publisle/publisle-rs/pull/38))
+
 ## [0.6.1](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.6.0...publisle-pdf-v0.6.1) - 2026-10-26
 
 ### Fixed
