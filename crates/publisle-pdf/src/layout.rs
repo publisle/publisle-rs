@@ -2054,7 +2054,8 @@ mod gap_regressions {
             blocks.push(serde_json::json!({"kind":"paragraph","inlines":[{"type":"text","value":"A paragraph to force pagination."}]}));
         }
         blocks.push(heading(1, "Later"));
-        let input = article_input(&directory(), serde_json::json!(blocks));
+        let mut input = article_input(&directory(), serde_json::json!(blocks));
+        input.pdf_standard = Some("ua-1".into());
         let (bytes, _) = crate::compile(&input).unwrap();
         let doc = lopdf::Document::load_mem(&bytes).unwrap();
         let dict = |id| doc.get_object(id).unwrap().as_dict().unwrap();
@@ -2101,6 +2102,41 @@ mod gap_regressions {
         let first_dest = first.get(b"Dest").unwrap().as_array().unwrap();
         let last_dest = last.get(b"Dest").unwrap().as_array().unwrap();
         assert_ne!(first_dest[0], last_dest[0]);
+    }
+
+    #[cfg(feature = "pdf-import")]
+    #[test]
+    fn pdf2_bookmarks_target_heading_structure_with_page_fallback() {
+        let mut input = article_input(
+            &directory(),
+            serde_json::json!([
+                {"kind":"heading","level":1,"inlines":[{"type":"text","value":"Heading"}]}
+            ]),
+        );
+        input.pdf_standard = Some("ua-2".into());
+        let (bytes, _) = crate::compile(&input).unwrap();
+        let doc = lopdf::Document::load_mem(&bytes).unwrap();
+        let dict = |id| doc.get_object(id).unwrap().as_dict().unwrap();
+        let root = dict(doc.trailer.get(b"Root").unwrap().as_reference().unwrap());
+        let outline = dict(root.get(b"Outlines").unwrap().as_reference().unwrap());
+        let item = dict(outline.get(b"First").unwrap().as_reference().unwrap());
+        assert!(item.get(b"Dest").is_err());
+        let action = item.get(b"A").unwrap().as_dict().unwrap();
+        assert_eq!(action.get(b"S").unwrap().as_name().unwrap(), b"GoTo");
+        let page = action.get(b"D").unwrap().as_array().unwrap();
+        let structure = action.get(b"SD").unwrap().as_array().unwrap();
+        assert_eq!(page[1..], structure[1..]);
+        assert!(
+            doc.get_pages()
+                .values()
+                .any(|id| *id == page[0].as_reference().unwrap())
+        );
+        let heading_id = structure[0].as_reference().unwrap();
+        assert_eq!(item.get(b"SE").unwrap().as_reference().unwrap(), heading_id);
+        assert_eq!(
+            dict(heading_id).get(b"S").unwrap().as_name().unwrap(),
+            b"H1"
+        );
     }
 
     #[cfg(feature = "pdf-import")]
