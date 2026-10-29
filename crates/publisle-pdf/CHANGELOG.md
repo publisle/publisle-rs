@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.6.2...publisle-pdf-v0.6.3) - 2026-10-29
+
+### Fixed
+
+- *(pdf)* per-cluster glyph fallback, tab normalisation, emergency word breaks
+
 ## [0.6.2](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.6.1...publisle-pdf-v0.6.2) - 2026-10-26
 
 ### Fixed
