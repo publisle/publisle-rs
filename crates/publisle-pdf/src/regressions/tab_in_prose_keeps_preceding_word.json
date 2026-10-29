@@ -1,0 +1,4 @@
+{
+  "description": "A tab in prose is a space, so the word before the tab is shaped instead of being replaced by U+FFFD.",
+  "text": "keyword\tvalue"
+}

@@ -75,38 +75,15 @@ impl Fonts {
     }
 
     fn select(&self, value: &str, role: &str) -> Result<usize> {
-        let supports = |font: &Font| {
-            let face = Face::from_slice(&font.bytes, font.index).unwrap();
-            // Coverage alone is insufficient: math fonts can expose isolated
-            // Arabic glyphs without Arabic joining/substitution tables.
-            if value
-                .chars()
-                .any(|c| ('\u{0600}'..='\u{06ff}').contains(&c))
-                && !face.tables().gsub.is_some_and(|table| {
-                    table
-                        .scripts
-                        .find(ttf_parser::Tag::from_bytes(b"arab"))
-                        .is_some()
-                })
-            {
-                return false;
-            }
-            value.chars().all(|c| {
-                c.is_control()
-                    || c == '\u{200d}'
-                    || c == '\u{200c}'
-                    || face.glyph_index(c).is_some()
-            })
-        };
         self.fonts
             .iter()
-            .position(|f| f.role == role && supports(f))
+            .position(|f| f.role == role && font_covers(f, value))
             .or_else(|| {
                 self.fonts
                     .iter()
-                    .position(|f| f.role == "fallback" && supports(f))
+                    .position(|f| f.role == "fallback" && font_covers(f, value))
             })
-            .or_else(|| self.fonts.iter().position(supports))
+            .or_else(|| self.fonts.iter().position(|f| font_covers(f, value)))
             .ok_or_else(|| {
                 Diagnostic::new(
                     "missing-glyph",
@@ -122,6 +99,20 @@ impl Fonts {
                     ),
                 )
             })
+    }
+
+    /// Whether any pinned font for `role` (then fallback, then any face) maps
+    /// every character. Line breaks and joiners are treated as covered so they
+    /// do not split a run; other controls, including tab, are not.
+    pub(crate) fn covers(&self, value: &str, role: &str) -> bool {
+        self.fonts
+            .iter()
+            .any(|font| font.role == role && font_covers(font, value))
+            || self
+                .fonts
+                .iter()
+                .any(|font| font.role == "fallback" && font_covers(font, value))
+            || self.fonts.iter().any(|font| font_covers(font, value))
     }
 
     pub fn shape(&mut self, value: &str, size: f32, role: &str, rtl: bool) -> Result<Shaped> {
@@ -295,6 +286,30 @@ impl Fonts {
             width: x,
         })
     }
+}
+
+fn font_covers(font: &Font, value: &str) -> bool {
+    let face = Face::from_slice(&font.bytes, font.index).unwrap();
+    // Coverage alone is insufficient: math fonts can expose isolated
+    // Arabic glyphs without Arabic joining/substitution tables.
+    if value
+        .chars()
+        .any(|c| ('\u{0600}'..='\u{06ff}').contains(&c))
+        && !face.tables().gsub.is_some_and(|table| {
+            table
+                .scripts
+                .find(ttf_parser::Tag::from_bytes(b"arab"))
+                .is_some()
+        })
+    {
+        return false;
+    }
+    // Tabs and other controls are not implicitly covered. rustybuzz maps a
+    // tab to glyph 0, which used to fail the whole token after select() had
+    // accepted it via `char::is_control`.
+    value.chars().all(|c| {
+        matches!(c, '\n' | '\r' | '\u{200c}' | '\u{200d}') || face.glyph_index(c).is_some()
+    })
 }
 
 #[cfg(test)]

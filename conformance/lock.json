@@ -54,6 +54,10 @@
     "figures/gibbs-overshoot.svg": "9c3c977f8a3a7fe2db6e70d7204adb4f1d66af38e8702a22ad1c0bbc2fd35574"
   },
   "localFiles": {
-    "regressions/math.json": "9087da536fd5cacd00b233f643a268b4c2bc739fe51e1af27e2becda2a5c3898"
+    "regressions/math.json": "9087da536fd5cacd00b233f643a268b4c2bc739fe51e1af27e2becda2a5c3898",
+    "regressions/emoji_replacement_preserves_following_space_and_punctuation.json": "b468ff9ca64c1db6d556d6cee679222e523aa30fe720cc57c9ab48b2f5606d6c",
+    "regressions/empty_caption_has_no_trailing_period.json": "91d16e4368b628eb6f9f181e0e9b43e3c1552e5ac7a706d5d816887753706c72",
+    "regressions/tab_in_prose_keeps_preceding_word.json": "bdaa4503d2cb8194aab6654e7ced7abc34bbeac9884a814c6cdf519fb05c0e26",
+    "regressions/twelve_column_table_compiles_without_overflow.json": "48c248343b5d219fee54eef10f8e2d501b511e19f299fbc0dcf76c9f50ccee1a"
   }
 }

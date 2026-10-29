@@ -1,0 +1,5 @@
+{
+  "description": "An uncovered emoji is replaced per grapheme cluster, leaving the following space and punctuation in the shaped run.",
+  "text": "Smile 🙂 and 🙂.",
+  "warning": "No pinned font covers \"🙂\" (U+1F642)."
+}

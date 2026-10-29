@@ -1,0 +1,31 @@
+{
+  "description": "Twelve equal columns compile by breaking overlong words. Every header and cell must survive in the shaped output.",
+  "headers": [
+    "Column0LongHeader",
+    "Column1LongHeader",
+    "Column2LongHeader",
+    "Column3LongHeader",
+    "Column4LongHeader",
+    "Column5LongHeader",
+    "Column6LongHeader",
+    "Column7LongHeader",
+    "Column8LongHeader",
+    "Column9LongHeader",
+    "Column10LongHeader",
+    "Column11LongHeader"
+  ],
+  "cells": [
+    "value0extralongcell",
+    "value1extralongcell",
+    "value2extralongcell",
+    "value3extralongcell",
+    "value4extralongcell",
+    "value5extralongcell",
+    "value6extralongcell",
+    "value7extralongcell",
+    "value8extralongcell",
+    "value9extralongcell",
+    "value10extralongcell",
+    "value11extralongcell"
+  ]
+}
