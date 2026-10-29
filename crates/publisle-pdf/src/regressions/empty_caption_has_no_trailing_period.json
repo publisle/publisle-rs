@@ -1,0 +1,14 @@
+{
+  "description": "An empty table or figure caption is the number alone, with no trailing period. A non-empty caption keeps the separator.",
+  "labels": [
+    "Table 1",
+    "Figure 1",
+    "Table 2. "
+  ],
+  "absent": [
+    "Table 1.",
+    "Table 1. ",
+    "Figure 1.",
+    "Figure 1. "
+  ]
+}

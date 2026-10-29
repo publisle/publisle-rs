@@ -4,6 +4,7 @@ use crate::{
     model::*,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use unicode_segmentation::UnicodeSegmentation;
 
 pub struct Layout {
     pub pages: Vec<Page>,
@@ -79,6 +80,9 @@ struct Piece {
     /// Baseline offset for superscript runs such as footnote markers.
     raise: f32,
     break_after: bool,
+    /// Font role used when this piece has to be shaped again.
+    role: String,
+    rtl: bool,
 }
 enum PieceKind {
     Text {
@@ -123,7 +127,8 @@ struct Builder<'a> {
     scheduled_notes: BTreeSet<usize>,
     rendering_notes: bool,
     warnings: Vec<Diagnostic>,
-    warned_runs: BTreeSet<String>,
+    warned_chars: BTreeSet<char>,
+    overlong_warned: bool,
 }
 pub fn build(input: &Input) -> Result<(Layout, Vec<Diagnostic>)> {
     if input.schema_version != 1 {
@@ -207,7 +212,8 @@ pub fn build(input: &Input) -> Result<(Layout, Vec<Diagnostic>)> {
         scheduled_notes: BTreeSet::new(),
         rendering_notes: false,
         warnings: Vec::new(),
-        warned_runs: BTreeSet::new(),
+        warned_chars: BTreeSet::new(),
+        overlong_warned: false,
     };
     builder.index_references();
     builder.new_page()?;
@@ -758,6 +764,8 @@ impl Builder<'_> {
                         descent: 0.,
                         raise: 0.,
                         break_after: true,
+                        role: String::new(),
+                        rtl: false,
                     });
                     continue;
                 }
@@ -782,6 +790,8 @@ impl Builder<'_> {
                         raise: 0.,
                         kind: PieceKind::Math(b, xml, value.clone()),
                         break_after: false,
+                        role: String::new(),
+                        rtl: false,
                     });
                     continue;
                 }
@@ -794,6 +804,14 @@ impl Builder<'_> {
                 _ => role,
             };
             let rtl = direction == Some("rtl") || (direction != Some("ltr") && self.rtl());
+            // A tab has no pinned glyph. rustybuzz maps it to glyph 0, and the
+            // old whole-token fallback then deleted the word before the tab.
+            // Code blocks expand tabs before they reach here.
+            let value = if font_role == "mono" {
+                value
+            } else {
+                value.replace('\t', " ")
+            };
             // Unicode line-break boundaries keep CJK breakable and preserve all text.
             let mut start = 0;
             for (end, opportunity) in unicode_linebreak::linebreaks(&value) {
@@ -823,6 +841,8 @@ impl Builder<'_> {
                     },
                     break_after: opportunity == unicode_linebreak::BreakOpportunity::Allowed
                         || word.chars().last().is_some_and(char::is_whitespace),
+                    role: font_role.to_string(),
+                    rtl,
                 });
             }
         }
@@ -984,34 +1004,111 @@ impl Builder<'_> {
         self.cursor -= size * 0.45;
         Ok(())
     }
-    /// Shape a run, degrading unsupported characters to a visible replacement
-    /// glyph with a warning instead of aborting the whole export.
+    /// Shape a run. An uncovered grapheme cluster becomes U+FFFD; covered
+    /// neighbours, including a following space or punctuation mark, stay.
     fn shape_checked(&mut self, word: &str, size: f32, role: &str, rtl: bool) -> Result<Shaped> {
         match self.output.fonts.shape(word, size, role, rtl) {
             Ok(shaped) => Ok(shaped),
-            Err(error) => {
-                if error.code == "missing-glyph" {
-                    let fingerprint =
-                        format!("{role}\0{}", word.chars().take(40).collect::<String>());
-                    if self.warned_runs.insert(fingerprint) {
-                        self.warnings.push(Diagnostic::new(
-                            "missing-glyph",
-                            format!(
-                                "No pinned font covers {:?}; rendered as a replacement glyph.",
-                                word.chars().take(40).collect::<String>()
-                            ),
-                        ));
-                    }
-                    if let Ok(shaped) = self.output.fonts.shape("\u{fffd}", size, role, rtl) {
-                        return Ok(shaped);
-                    }
-                    if let Ok(shaped) = self.output.fonts.shape("\u{fffd}", size, "fallback", rtl) {
-                        return Ok(shaped);
+            Err(error) if error.code == "missing-glyph" => {
+                self.shape_replacing_missing(word, size, role, rtl, error)
+            }
+            Err(error) => Err(error),
+        }
+    }
+    fn shape_replacing_missing(
+        &mut self,
+        word: &str,
+        size: f32,
+        role: &str,
+        rtl: bool,
+        error: Diagnostic,
+    ) -> Result<Shaped> {
+        let clusters: Vec<&str> = word.graphemes(true).collect();
+        if clusters.is_empty() {
+            return Err(error);
+        }
+        let mut parts = Vec::new();
+        let mut run = String::new();
+        for cluster in clusters {
+            if self.output.fonts.covers(cluster, role) {
+                run.push_str(cluster);
+                continue;
+            }
+            self.push_shaped_run(&mut run, size, role, rtl, &mut parts)?;
+            self.warn_missing_cluster(cluster, role);
+            parts.push(self.replacement_glyph(size, role, rtl)?);
+        }
+        self.push_shaped_run(&mut run, size, role, rtl, &mut parts)?;
+        Ok(concat_shaped(parts, rtl))
+    }
+    fn push_shaped_run(
+        &mut self,
+        run: &mut String,
+        size: f32,
+        role: &str,
+        rtl: bool,
+        parts: &mut Vec<Shaped>,
+    ) -> Result<()> {
+        if run.is_empty() {
+            return Ok(());
+        }
+        match self.output.fonts.shape(run, size, role, rtl) {
+            Ok(shaped) => parts.push(shaped),
+            Err(error) if error.code == "missing-glyph" => {
+                let clusters: Vec<String> = run.graphemes(true).map(str::to_string).collect();
+                for cluster in clusters {
+                    match self.output.fonts.shape(&cluster, size, role, rtl) {
+                        Ok(shaped) => parts.push(shaped),
+                        Err(inner) if inner.code == "missing-glyph" => {
+                            self.warn_missing_cluster(&cluster, role);
+                            parts.push(self.replacement_glyph(size, role, rtl)?);
+                        }
+                        Err(inner) => return Err(inner),
                     }
                 }
-                Err(error)
+            }
+            Err(error) => return Err(error),
+        }
+        run.clear();
+        Ok(())
+    }
+    fn warn_missing_cluster(&mut self, cluster: &str, role: &str) {
+        let mut pending: Vec<char> = cluster
+            .chars()
+            .filter(|ch| !is_covered_control(*ch))
+            .filter(|ch| !self.output.fonts.covers(&ch.to_string(), role))
+            .collect();
+        if pending.is_empty() {
+            pending.extend(cluster.chars().filter(|ch| !is_covered_control(*ch)));
+        }
+        for ch in pending {
+            if self.warned_chars.insert(ch) {
+                self.warnings.push(Diagnostic::new(
+                    "missing-glyph",
+                    format!(
+                        "No pinned font covers {:?} (U+{:04X}).",
+                        ch.to_string(),
+                        u32::from(ch)
+                    ),
+                ));
             }
         }
+    }
+    fn replacement_glyph(&mut self, size: f32, role: &str, rtl: bool) -> Result<Shaped> {
+        if let Ok(shaped) = self.output.fonts.shape("\u{fffd}", size, role, rtl) {
+            return Ok(shaped);
+        }
+        self.output.fonts.shape("\u{fffd}", size, "fallback", rtl)
+    }
+    fn warn_overlong_word(&mut self) {
+        if self.overlong_warned {
+            return;
+        }
+        self.overlong_warned = true;
+        self.warnings.push(Diagnostic::new(
+            "overlong-word-broken",
+            "An overlong word was broken at a grapheme boundary.",
+        ));
     }
     fn lines(
         &mut self,
@@ -1020,7 +1117,14 @@ impl Builder<'_> {
         role: &str,
         width: f32,
     ) -> Result<Vec<Vec<Piece>>> {
-        wrap(self.pieces(inlines, size, role)?, width)
+        let pieces = self.pieces(inlines, size, role)?;
+        let (lines, broke) = wrap(pieces, width, &mut |text, size, role, rtl| {
+            self.shape_checked(text, size, role, rtl)
+        })?;
+        if broke {
+            self.warn_overlong_word();
+        }
+        Ok(lines)
     }
     fn line_notes(&mut self, line: &[Piece]) -> Result<Vec<(usize, f32)>> {
         let mut indices = BTreeSet::new();
@@ -1102,6 +1206,7 @@ impl Builder<'_> {
         Ok(())
     }
     fn block(&mut self, block: &Block) -> Result<()> {
+        self.overlong_warned = false;
         match block {
             Block::Heading {
                 level,
@@ -1411,12 +1516,11 @@ impl Builder<'_> {
                 self.cursor -= 10.;
                 self.figures += 1;
                 let tag = self.tag("Caption", Some(tag), None, None, false);
-                let mut text = vec![plain(&format!(
-                    "{} {}. ",
+                let text = numbered_caption(
                     if self.rtl() { "الشكل" } else { "Figure" },
-                    self.figures
-                ))];
-                text.extend(caption.iter().cloned());
+                    self.figures,
+                    caption,
+                );
                 // Short captions centre under the figure; long ones wrap left.
                 let fits = self
                     .lines(&text, 9., "regular", self.width())
@@ -1440,12 +1544,11 @@ impl Builder<'_> {
                 let table = self.tag("Table", None, None, None, false);
                 self.output.tags[table].label = label.clone();
                 let tag = self.tag("Caption", Some(table), None, None, false);
-                let mut text = vec![plain(&format!(
-                    "{} {}. ",
+                let text = numbered_caption(
                     if self.rtl() { "الجدول" } else { "Table" },
-                    self.tables
-                ))];
-                text.extend(caption.iter().cloned());
+                    self.tables,
+                    caption,
+                );
                 let fits = self
                     .lines(&text, 9., "regular", self.width())
                     .map(|lines| lines.len() == 1)
@@ -1476,8 +1579,10 @@ impl Builder<'_> {
                     let mut cells = vec![];
                     let mut notes = BTreeMap::new();
                     for cell in row {
-                        // Wide content scales down to fit, matching the
-                        // reference renderer's narrow-but-complete behaviour.
+                        // Shrink toward 0.6, then stop. Words that are still
+                        // wider than the cell break at grapheme boundaries
+                        // inside wrap(); math and unsplittable groups still
+                        // return layout-overflow.
                         let mut scale = 1.;
                         let lines = loop {
                             match self.lines(
@@ -1487,8 +1592,8 @@ impl Builder<'_> {
                                 cell_width - 8.,
                             ) {
                                 Ok(lines) => break lines,
-                                Err(error) if error.code == "layout-overflow" && scale > 0.4 => {
-                                    scale *= 0.8;
+                                Err(error) if error.code == "layout-overflow" && scale > 0.6 => {
+                                    scale = (scale * 0.8).max(0.6);
                                 }
                                 Err(error) => return Err(error),
                             }
@@ -1649,6 +1754,7 @@ impl Builder<'_> {
         if self.bibliography_written {
             return Ok(());
         }
+        self.overlong_warned = false;
         self.bibliography_written = true;
         if self.input.bibliography.is_empty() {
             return Ok(());
@@ -1677,50 +1783,200 @@ impl Builder<'_> {
     }
 }
 
-fn wrap(pieces: Vec<Piece>, width: f32) -> Result<Vec<Vec<Piece>>> {
+fn is_covered_control(ch: char) -> bool {
+    matches!(ch, '\n' | '\r' | '\u{200c}' | '\u{200d}')
+}
+
+fn numbered_caption(name: &str, number: usize, caption: &[Inline]) -> Vec<Inline> {
+    let label = if caption.is_empty() {
+        format!("{name} {number}")
+    } else {
+        format!("{name} {number}. ")
+    };
+    let mut text = vec![plain(&label)];
+    text.extend(caption.iter().cloned());
+    text
+}
+
+fn concat_shaped(mut parts: Vec<Shaped>, rtl: bool) -> Shaped {
+    let mut cursor = 0.;
+    let order: Vec<usize> = if rtl {
+        (0..parts.len()).rev().collect()
+    } else {
+        (0..parts.len()).collect()
+    };
+    for index in order {
+        for glyph in &mut parts[index].glyphs {
+            glyph.x += cursor;
+        }
+        cursor += parts[index].width;
+    }
+    Shaped {
+        glyphs: parts.into_iter().flat_map(|part| part.glyphs).collect(),
+        width: cursor,
+    }
+}
+
+fn span_overflow() -> Diagnostic {
+    Diagnostic::new(
+        "layout-overflow",
+        "An unbreakable text or math span exceeds the column width.",
+    )
+}
+
+fn group_overflow() -> Diagnostic {
+    Diagnostic::new(
+        "layout-overflow",
+        "An unbreakable inline group exceeds the column width.",
+    )
+}
+
+fn fits(actual: f32, width: f32) -> bool {
+    actual <= width
+}
+
+/// Break one text piece into grapheme chunks that each fit `width`.
+fn split_text_piece<F>(piece: Piece, width: f32, measure: &mut F) -> Result<Vec<Piece>>
+where
+    F: FnMut(&str, f32, &str, bool) -> Result<Shaped>,
+{
+    let Piece {
+        kind:
+            PieceKind::Text {
+                text,
+                link,
+                target,
+                strike,
+                ..
+            },
+        size,
+        ascent,
+        descent,
+        raise,
+        role,
+        rtl,
+        ..
+    } = piece
+    else {
+        return Err(span_overflow());
+    };
+    let graphemes: Vec<(usize, &str)> = text.grapheme_indices(true).collect();
+    if graphemes.len() < 2 {
+        return Err(span_overflow());
+    }
+    let mut widths = Vec::with_capacity(graphemes.len());
+    for (_, cluster) in &graphemes {
+        let shaped = measure(cluster, size, &role, rtl)?;
+        if !fits(shaped.width, width) {
+            return Err(span_overflow());
+        }
+        widths.push(shaped.width);
+    }
+    let mut chunks = Vec::new();
+    let mut start = 0;
+    while start < graphemes.len() {
+        let mut end = start + 1;
+        let mut acc = widths[start];
+        while end < graphemes.len() && fits(acc + widths[end], width) {
+            acc += widths[end];
+            end += 1;
+        }
+        let shaped = loop {
+            let from = graphemes[start].0;
+            let to = if end == graphemes.len() {
+                text.len()
+            } else {
+                graphemes[end].0
+            };
+            let shaped = measure(&text[from..to], size, &role, rtl)?;
+            if fits(shaped.width, width) || end == start + 1 {
+                if !fits(shaped.width, width) {
+                    return Err(span_overflow());
+                }
+                break (text[from..to].to_string(), shaped);
+            }
+            end -= 1;
+        };
+        let (slice, shaped) = shaped;
+        let chunk_width = shaped.width;
+        chunks.push(Piece {
+            kind: PieceKind::Text {
+                shaped,
+                text: slice,
+                link: link.clone(),
+                target: target.clone(),
+                strike,
+            },
+            width: chunk_width,
+            size,
+            ascent,
+            descent,
+            raise,
+            break_after: true,
+            role: role.clone(),
+            rtl,
+        });
+        start = end;
+    }
+    Ok(chunks)
+}
+
+fn wrap<F>(pieces: Vec<Piece>, width: f32, measure: &mut F) -> Result<(Vec<Vec<Piece>>, bool)>
+where
+    F: FnMut(&str, f32, &str, bool) -> Result<Shaped>,
+{
     let mut lines: Vec<Vec<Piece>> = vec![];
     let mut line = vec![];
     let mut used = 0.;
+    let mut broke = false;
     for piece in pieces {
         if matches!(piece.kind, PieceKind::Break) {
             lines.push(std::mem::take(&mut line));
             used = 0.;
             continue;
         }
-        if piece.width > width {
-            return Err(Diagnostic::new(
-                "layout-overflow",
-                "An unbreakable text or math span exceeds the column width.",
-            ));
-        }
-        if used + piece.width > width && !line.is_empty() {
-            let split = line
-                .iter()
-                .rposition(|p: &Piece| p.break_after)
-                .map(|i| i + 1)
-                .ok_or_else(|| {
-                    Diagnostic::new(
-                        "layout-overflow",
-                        "An unbreakable inline group exceeds the column width.",
-                    )
-                })?;
-            let carry = line.split_off(split);
-            lines.push(std::mem::replace(&mut line, carry));
-            used = line.iter().map(|p| p.width).sum();
-            if used + piece.width > width {
-                return Err(Diagnostic::new(
-                    "layout-overflow",
-                    "An unbreakable inline group exceeds the column width.",
-                ));
+        let fragments = if piece.width > width {
+            match &piece.kind {
+                PieceKind::Text { .. } => {
+                    let chunks = split_text_piece(piece, width, measure)?;
+                    broke = true;
+                    chunks
+                }
+                _ => return Err(span_overflow()),
             }
+        } else {
+            vec![piece]
+        };
+        for piece in fragments {
+            if piece.width > width {
+                return Err(span_overflow());
+            }
+            if used + piece.width > width && !line.is_empty() {
+                let split = line
+                    .iter()
+                    .rposition(|p: &Piece| p.break_after)
+                    .map(|i| i + 1)
+                    .ok_or_else(group_overflow)?;
+                let carry = line.split_off(split);
+                lines.push(std::mem::replace(&mut line, carry));
+                used = line.iter().map(|p| p.width).sum();
+                if used + piece.width > width {
+                    return Err(group_overflow());
+                }
+            }
+            used += piece.width;
+            line.push(piece);
         }
-        used += piece.width;
-        line.push(piece);
     }
     if !line.is_empty() {
         lines.push(line);
     }
-    Ok(lines)
+    Ok((lines, broke))
+}
+
+#[cfg(test)]
+fn unmeasured_shape(_: &str, _: f32, _: &str, _: bool) -> Result<Shaped> {
+    Err(span_overflow())
 }
 
 // Resolve bidi order at line scope, while emitting draw records in logical
@@ -1945,6 +2201,8 @@ mod bidi_tests {
             descent: 2.,
             raise: 0.,
             break_after: true,
+            role: "regular".into(),
+            rtl: false,
         }
     }
     #[test]
@@ -1959,18 +2217,40 @@ mod bidi_tests {
             descent: 2.,
             raise: 0.,
             break_after: false,
+            role: String::new(),
+            rtl: false,
         };
         let mut dot = piece(".");
         dot.width = 3.;
         dot.break_after = false;
-        let lines = wrap(vec![prefix, equation, dot], 100.).unwrap();
+        let lines = wrap(vec![prefix, equation, dot], 100., &mut unmeasured_shape)
+            .unwrap()
+            .0;
         assert_eq!(lines.iter().map(Vec::len).collect::<Vec<_>>(), vec![1, 2]);
     }
     #[test]
     fn cannot_break_inside_styled_words() {
         let mut first = piece("unbreak");
         first.break_after = false;
-        assert!(wrap(vec![first, piece("able")], 15.).is_err());
+        assert!(wrap(vec![first, piece("able")], 15., &mut unmeasured_shape).is_err());
+    }
+    #[test]
+    fn wide_math_is_still_layout_overflow() {
+        let equation = Piece {
+            kind: PieceKind::Math(BoxLayout::default(), String::new(), String::new()),
+            width: 40.,
+            size: 9.,
+            ascent: 8.,
+            descent: 2.,
+            raise: 0.,
+            break_after: false,
+            role: String::new(),
+            rtl: false,
+        };
+        match wrap(vec![equation], 10., &mut unmeasured_shape) {
+            Err(error) => assert_eq!(error.code, "layout-overflow"),
+            Ok(_) => panic!("wide math should still overflow"),
+        }
     }
     #[test]
     fn mixed_script_words_keep_their_reading_direction() {
@@ -2276,20 +2556,29 @@ mod gap_regressions {
             [[{"type":"text","value":"header"}]],
             [[{"type":"text","value":long}]]
         ]}]);
-        let (layout, _) = build(&article_input(&directory(), blocks)).unwrap();
+        let (layout, warnings) = build(&article_input(&directory(), blocks)).unwrap();
+        let joined = draw_text(&layout);
+        assert!(
+            joined.contains(&long),
+            "expected the full cell after an emergency break, got {joined}"
+        );
         let sizes: Vec<f32> = layout
             .pages
             .iter()
             .flat_map(|page| &page.draws)
             .filter_map(|draw| match &draw.kind {
-                DrawKind::Text { size, text, .. } if text.contains("unbreakable") => Some(*size),
+                DrawKind::Text { size, text, .. } if long.contains(text) => Some(*size),
                 _ => None,
             })
             .collect();
         assert!(!sizes.is_empty(), "cell text missing");
         assert!(
-            sizes.iter().all(|size| *size < 9.),
-            "expected the cell to shrink below 9pt, got {sizes:?}"
+            sizes.iter().all(|size| *size + 0.01 >= 9. * 0.6),
+            "table text must not shrink below 0.6, got {sizes:?}"
+        );
+        assert!(
+            warnings.iter().any(|d| d.code == "overlong-word-broken"),
+            "expected an emergency-break warning, got {warnings:?}"
         );
     }
 
@@ -2475,5 +2764,242 @@ mod gap_regressions {
             single > 4. + 1.,
             "expected right alignment to move the cell, got x={single}"
         );
+    }
+
+    fn draw_text(layout: &Layout) -> String {
+        layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.draws)
+            .filter_map(|draw| match &draw.kind {
+                DrawKind::Text { text, .. } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn shaped_plain(layout: &Layout, shaped: &Shaped) -> String {
+        let mut glyphs: Vec<_> = shaped.glyphs.iter().collect();
+        glyphs.sort_by(|a, b| a.x.total_cmp(&b.x));
+        glyphs
+            .into_iter()
+            .map(|glyph| {
+                layout.fonts.fonts[glyph.font]
+                    .glyphs
+                    .iter()
+                    .find(|(_, cid)| **cid == glyph.cid)
+                    .map(|(unit, _)| unit.unicode.clone())
+                    .unwrap_or_default()
+            })
+            .collect()
+    }
+
+    fn glyph_text(layout: &Layout) -> String {
+        layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.draws)
+            .filter_map(|draw| match &draw.kind {
+                DrawKind::Text { shaped, .. } => Some(shaped_plain(layout, shaped)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn tab_in_prose_keeps_preceding_word() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "regressions/tab_in_prose_keeps_preceding_word.json"
+        ))
+        .unwrap();
+        let text = fixture["text"].as_str().unwrap();
+        let blocks = serde_json::json!([{"kind":"paragraph","inlines":[
+            {"type":"text","value":text}
+        ]}]);
+        let (layout, _) = build(&article_input(&directory(), blocks)).unwrap();
+        let painted = glyph_text(&layout);
+        assert!(
+            painted.contains("keyword"),
+            "the word before the tab was replaced: {painted}"
+        );
+        assert!(
+            painted.contains("value"),
+            "lost the word after the tab: {painted}"
+        );
+        assert!(
+            !painted.contains('\u{fffd}'),
+            "a tab in prose should become a space, got {painted}"
+        );
+        assert!(!painted.contains('\t'), "{painted}");
+    }
+
+    #[test]
+    fn emoji_replacement_preserves_following_space_and_punctuation() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "regressions/emoji_replacement_preserves_following_space_and_punctuation.json"
+        ))
+        .unwrap();
+        let text = fixture["text"].as_str().unwrap();
+        let blocks = serde_json::json!([{"kind":"paragraph","inlines":[
+            {"type":"text","value":text}
+        ]}]);
+        let (layout, warnings) = build(&article_input(&directory(), blocks)).unwrap();
+        let painted = glyph_text(&layout);
+        assert!(painted.contains("Smile"), "{painted}");
+        assert!(painted.contains("and"), "{painted}");
+        let runs: Vec<String> = layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.draws)
+            .filter_map(|draw| match &draw.kind {
+                DrawKind::Text { text, shaped, .. } if text.contains('\u{1f642}') => {
+                    Some(shaped_plain(&layout, shaped))
+                }
+                _ => None,
+            })
+            .collect();
+        assert!(
+            runs.iter().any(|run| run.contains("\u{fffd} ")),
+            "the space after the emoji was dropped: {runs:?}"
+        );
+        assert!(
+            runs.iter().any(|run| run.contains("\u{fffd}.")),
+            "the punctuation after the emoji was dropped: {runs:?}"
+        );
+        for run in runs.iter().filter(|run| run.contains('\u{fffd}')) {
+            let draw = layout
+                .pages
+                .iter()
+                .flat_map(|page| &page.draws)
+                .find(|draw| {
+                    matches!(&draw.kind, DrawKind::Text { text, shaped, .. }
+                    if text.contains('\u{1f642}') && shaped_plain(&layout, shaped) == *run)
+                });
+            let DrawKind::Text { shaped, .. } = &draw.unwrap().kind else {
+                unreachable!()
+            };
+            let mut glyphs: Vec<_> = shaped.glyphs.iter().collect();
+            glyphs.sort_by(|a, b| a.x.total_cmp(&b.x));
+            assert!(
+                glyphs.len() >= 2,
+                "expected the replacement plus what follows"
+            );
+            let (first, second) = (glyphs[0], glyphs[1]);
+            assert!(
+                (second.x - (first.x + first.advance)).abs() < 0.05,
+                "x offsets first {}+{} second {}",
+                first.x,
+                first.advance,
+                second.x
+            );
+        }
+        let missing: Vec<_> = warnings
+            .iter()
+            .filter(|warning| warning.code == "missing-glyph")
+            .collect();
+        assert_eq!(missing.len(), 1, "warn once per character: {missing:?}");
+        assert_eq!(missing[0].message, fixture["warning"].as_str().unwrap());
+    }
+
+    #[test]
+    fn twelve_column_table_compiles_without_overflow() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "regressions/twelve_column_table_compiles_without_overflow.json"
+        ))
+        .unwrap();
+        let headers = fixture["headers"].as_array().unwrap();
+        let cells = fixture["cells"].as_array().unwrap();
+        assert_eq!(headers.len(), 12);
+        assert_eq!(cells.len(), 12);
+        let header_row: Vec<_> = headers
+            .iter()
+            .map(|value| vec![serde_json::json!({"type":"text","value":value.as_str().unwrap()})])
+            .collect();
+        let body_row: Vec<_> = cells
+            .iter()
+            .map(|value| vec![serde_json::json!({"type":"text","value":value.as_str().unwrap()})])
+            .collect();
+        let blocks = serde_json::json!([{
+            "kind":"table",
+            "headerRows":1,
+            "caption":[{"type":"text","value":"Wide"}],
+            "rows":[header_row, body_row]
+        }]);
+        let (layout, warnings) = build(&article_input(&directory(), blocks)).unwrap();
+        let painted = glyph_text(&layout);
+        for value in headers.iter().chain(cells) {
+            let text = value.as_str().unwrap();
+            assert!(
+                painted.contains(text),
+                "{text} missing from shaped output: {painted}"
+            );
+        }
+        assert_eq!(
+            warnings
+                .iter()
+                .filter(|warning| warning.code == "overlong-word-broken")
+                .count(),
+            1,
+            "one emergency-break warning per table block: {warnings:?}"
+        );
+    }
+
+    #[test]
+    fn empty_caption_has_no_trailing_period() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "regressions/empty_caption_has_no_trailing_period.json"
+        ))
+        .unwrap();
+        let mut blocks = vec![
+            serde_json::json!({"kind":"table","headerRows":1,"caption":[],"rows":[
+                [[{"type":"text","value":"h"}]],
+                [[{"type":"text","value":"c"}]]
+            ]}),
+            serde_json::json!({"kind":"table","headerRows":0,"caption":[
+                {"type":"text","value":"Results"}
+            ],"rows":[
+                [[{"type":"text","value":"c"}]]
+            ]}),
+        ];
+        #[cfg(feature = "raster")]
+        let png = {
+            let path = std::env::temp_dir()
+                .join(format!("publisle-empty-caption-{}.png", std::process::id()));
+            image::RgbaImage::from_pixel(2, 2, image::Rgba([0, 0, 0, 255]))
+                .save(&path)
+                .unwrap();
+            blocks.push(serde_json::json!({
+                "kind":"figure",
+                "src":"dot.png",
+                "alt":"Dot",
+                "caption":[]
+            }));
+            path
+        };
+        let mut input = article_input(&directory(), serde_json::Value::Array(blocks));
+        #[cfg(feature = "raster")]
+        input.assets.push(Asset {
+            source: "dot.png".into(),
+            path: png,
+        });
+        let (layout, _) = build(&input).unwrap();
+        let painted = glyph_text(&layout);
+        for label in fixture["labels"].as_array().unwrap() {
+            let label = label.as_str().unwrap();
+            if !cfg!(feature = "raster") && label.starts_with("Figure") {
+                continue;
+            }
+            assert!(painted.contains(label), "missing {label} in {painted}");
+        }
+        for absent in fixture["absent"].as_array().unwrap() {
+            let absent = absent.as_str().unwrap();
+            if !cfg!(feature = "raster") && absent.contains("Figure") {
+                continue;
+            }
+            assert!(
+                !painted.contains(absent),
+                "{absent} should not be painted, got {painted}"
+            );
+        }
     }
 }

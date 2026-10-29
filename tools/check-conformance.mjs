@@ -91,3 +91,16 @@ assert.deepEqual(
   await readFile(new URL("regressions/math.json", root)),
   "Published PDF regression fixture differs from conformance",
 );
+
+for (const name of [
+  "tab_in_prose_keeps_preceding_word.json",
+  "emoji_replacement_preserves_following_space_and_punctuation.json",
+  "twelve_column_table_compiles_without_overflow.json",
+  "empty_caption_has_no_trailing_period.json",
+]) {
+  assert.deepEqual(
+    await readFile(new URL(`../crates/publisle-pdf/src/regressions/${name}`, root)),
+    await readFile(new URL(`regressions/${name}`, root)),
+    `${name}: published regression fixture differs from conformance`,
+  );
+}
