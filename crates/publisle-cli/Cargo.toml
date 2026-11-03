@@ -9,7 +9,7 @@ homepage.workspace = true
 authors.workspace = true
 readme = "README.md"
 description = "Publisle native PDF and math command line tools"
-documentation = "https://docs.rs/publisle-cli"
+documentation = "https://github.com/publisle/publisle-rs/blob/main/crates/publisle-cli/README.md"
 keywords = ["pdf", "typesetting", "math", "cli"]
 categories = ["command-line-utilities"]
 
