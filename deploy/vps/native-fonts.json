@@ -55,5 +55,15 @@
  {
   "path": "/app/fonts/DejaVuSans-BoldOblique.ttf",
   "role": "fallback"
+ },
+ {
+  "path": "/app/fonts/NotoEmoji-Regular.ttf",
+  "role": "fallback",
+  "index": 0
+ },
+ {
+  "path": "/app/fonts/NotoSansMath-Regular.ttf",
+  "role": "math",
+  "index": 0
  }
 ]

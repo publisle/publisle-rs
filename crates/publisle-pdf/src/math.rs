@@ -96,6 +96,278 @@ pub enum Style {
     Script,
 }
 
+fn limit_operator(op: &str) -> bool {
+    ["∑", "∏", "∐", "⋃", "⋂", "lim", "max", "min", "sup", "inf"].contains(&op)
+}
+
+fn scaled_operator(op: &str) -> bool {
+    limit_operator(op) || op == "∫"
+}
+
+fn variant_operator(op: &str) -> bool {
+    ["∑", "∏", "∐", "∫", "⋃"].contains(&op)
+}
+
+struct MathGlyph {
+    id: u16,
+    upem: f32,
+    y_min: i16,
+    y_max: i16,
+}
+
+struct AssemblyPart {
+    id: u16,
+    full_advance: u16,
+    start_connector: u16,
+    end_connector: u16,
+    extender: bool,
+}
+
+enum DelimiterPlan {
+    Glyph(MathGlyph),
+    Assembly {
+        parts: Vec<AssemblyPart>,
+        min_overlap: u16,
+        upem: f32,
+    },
+}
+
+fn larger_operator_variant(fonts: &Fonts, text: &str) -> Option<MathGlyph> {
+    let ch = single_char(text)?;
+    let face = math_face(fonts)?;
+    let math = face.tables().math?;
+    let variants = math.variants?;
+    let base = face.glyph_index(ch)?;
+    let construction = variants.vertical_constructions.get(base)?;
+    let min_height = math
+        .constants
+        .map(|constants| constants.display_operator_min_height())
+        .unwrap_or(0);
+    let mut covering = None;
+    let mut largest = None;
+    for variant in construction.variants {
+        let item = (variant.variant_glyph.0, variant.advance_measurement);
+        if largest.is_none_or(|(_, height)| item.1 >= height) {
+            largest = Some(item);
+        }
+        if item.1 >= min_height && covering.is_none_or(|(_, height)| item.1 < height) {
+            covering = Some(item);
+        }
+    }
+    let (id, _) = covering.or(largest)?;
+    if id == base.0 {
+        return None;
+    }
+    let bounds = face.glyph_bounding_box(ttf_parser::GlyphId(id))?;
+    Some(MathGlyph {
+        id,
+        upem: face.units_per_em() as f32,
+        y_min: bounds.y_min,
+        y_max: bounds.y_max,
+    })
+}
+
+fn single_char(text: &str) -> Option<char> {
+    let mut chars = text.chars();
+    let ch = chars.next()?;
+    chars.next().is_none().then_some(ch)
+}
+
+fn math_face(fonts: &Fonts) -> Option<ttf_parser::Face<'_>> {
+    let font = fonts.fonts.iter().find(|font| font.role == "math")?;
+    ttf_parser::Face::parse(&font.bytes, font.index).ok()
+}
+
+fn delimiter_plan(fonts: &Fonts, text: &str, target_px: f32, size: f32) -> Option<DelimiterPlan> {
+    let ch = single_char(text)?;
+    let face = math_face(fonts)?;
+    let math = face.tables().math?;
+    let variants = math.variants?;
+    let gid = face.glyph_index(ch)?;
+    let construction = variants.vertical_constructions.get(gid)?;
+    let upem = face.units_per_em() as f32;
+    let gap = math
+        .constants
+        .map(|constants| constants.stack_gap_min().value.max(0) as f32)
+        .unwrap_or(0.);
+    let target_units = ((target_px + gap * size / upem) / size * upem).ceil() as u32;
+    let mut best: Option<(u16, u16)> = None;
+    for variant in construction.variants {
+        if u32::from(variant.advance_measurement) >= target_units
+            && best.is_none_or(|(_, height)| variant.advance_measurement < height)
+        {
+            best = Some((variant.variant_glyph.0, variant.advance_measurement));
+        }
+    }
+    if let Some((id, _)) = best {
+        let bounds = face.glyph_bounding_box(ttf_parser::GlyphId(id))?;
+        return Some(DelimiterPlan::Glyph(MathGlyph {
+            id,
+            upem,
+            y_min: bounds.y_min,
+            y_max: bounds.y_max,
+        }));
+    }
+    let assembly = construction.assembly?;
+    let parts: Vec<_> = assembly
+        .parts
+        .into_iter()
+        .map(|part| AssemblyPart {
+            id: part.glyph_id.0,
+            full_advance: part.full_advance,
+            start_connector: part.start_connector_length,
+            end_connector: part.end_connector_length,
+            extender: part.part_flags.extender(),
+        })
+        .collect();
+    if parts.is_empty() {
+        return None;
+    }
+    Some(DelimiterPlan::Assembly {
+        parts: repeat_extenders(&parts, variants.min_connector_overlap, target_units),
+        min_overlap: variants.min_connector_overlap,
+        upem,
+    })
+}
+
+fn connector_overlap(min_overlap: u16, previous: &AssemblyPart, next: &AssemblyPart) -> u16 {
+    min_overlap
+        .min(previous.end_connector)
+        .min(next.start_connector)
+}
+
+fn assembly_height(parts: &[AssemblyPart], min_overlap: u16) -> u32 {
+    let mut height = 0u32;
+    for (index, part) in parts.iter().enumerate() {
+        height += u32::from(part.full_advance);
+        if let Some(next) = parts.get(index + 1) {
+            height = height.saturating_sub(u32::from(connector_overlap(min_overlap, part, next)));
+        }
+    }
+    height
+}
+
+fn repeat_extenders(parts: &[AssemblyPart], min_overlap: u16, target: u32) -> Vec<AssemblyPart> {
+    let mut extra = 0u32;
+    loop {
+        let expanded = expand_parts(parts, extra);
+        if assembly_height(&expanded, min_overlap) >= target
+            || extra >= 32
+            || !parts.iter().any(|part| part.extender)
+        {
+            return expanded;
+        }
+        extra += 1;
+    }
+}
+
+fn expand_parts(parts: &[AssemblyPart], extra: u32) -> Vec<AssemblyPart> {
+    let mut expanded = Vec::new();
+    for part in parts {
+        let count = if part.extender { 1 + extra } else { 1 };
+        for _ in 0..count {
+            expanded.push(AssemblyPart {
+                id: part.id,
+                full_advance: part.full_advance,
+                start_connector: part.start_connector,
+                end_connector: part.end_connector,
+                extender: part.extender,
+            });
+        }
+    }
+    expanded
+}
+
+fn glyph_box(shaped: Shaped, size: f32, ascent: f32, descent: f32, color: [f32; 3]) -> BoxLayout {
+    BoxLayout {
+        width: shaped.width,
+        ascent,
+        descent,
+        runs: vec![Run {
+            shaped,
+            x: 0.,
+            y: 0.,
+            size,
+            color,
+        }],
+        rules: vec![],
+        backgrounds: vec![],
+    }
+}
+
+fn stretch_delimiter(
+    fonts: &mut Fonts,
+    text: &str,
+    target: f32,
+    size: f32,
+    color: [f32; 3],
+) -> Result<Option<BoxLayout>> {
+    let Some(plan) = delimiter_plan(fonts, text, target, size) else {
+        return Ok(None);
+    };
+    match plan {
+        DelimiterPlan::Glyph(glyph) => {
+            let shaped = fonts.shape_glyph(glyph.id, size, "math", text)?;
+            let scale = size / glyph.upem;
+            Ok(Some(glyph_box(
+                shaped,
+                size,
+                glyph.y_max as f32 * scale,
+                (-glyph.y_min as f32 * scale).max(0.),
+                color,
+            )))
+        }
+        DelimiterPlan::Assembly {
+            parts,
+            min_overlap,
+            upem,
+        } => {
+            let scale = size / upem;
+            let mut shaped = Shaped {
+                glyphs: Vec::new(),
+                width: 0.,
+            };
+            let mut baseline = 0f32;
+            for (index, part) in parts.iter().enumerate() {
+                let unicode = if index == 0 { text } else { "" };
+                let mut piece = fonts.shape_glyph(part.id, size, "math", unicode)?;
+                for glyph in &mut piece.glyphs {
+                    glyph.y = baseline;
+                }
+                shaped.width = shaped.width.max(piece.width);
+                shaped.glyphs.append(&mut piece.glyphs);
+                if let Some(next) = parts.get(index + 1) {
+                    let overlap = f32::from(connector_overlap(min_overlap, part, next)) * scale;
+                    baseline += f32::from(part.full_advance) * scale - overlap;
+                }
+            }
+            let height = baseline
+                + parts
+                    .last()
+                    .map(|part| f32::from(part.full_advance) * scale)
+                    .unwrap_or(0.);
+            Ok(Some(glyph_box(shaped, size, height, 0., color)))
+        }
+    }
+}
+
+fn scaled_delimiter(
+    fonts: &mut Fonts,
+    text: &str,
+    body: &BoxLayout,
+    size: f32,
+    color: [f32; 3],
+) -> Result<BoxLayout> {
+    let delimiter_size = ((body.ascent + body.descent) / 1.07).max(size);
+    layout(
+        &Math::operator(text.to_string()),
+        fonts,
+        delimiter_size,
+        color,
+        Style::Text,
+    )
+}
+
 pub fn layout(
     node: &Math,
     fonts: &mut Fonts,
@@ -114,33 +386,60 @@ pub fn layout(
             layout(body, fonts, size, color, style)
         }
         Math::Text(text) | Math::Operator(text, _) | Math::PlainText(text) => {
-            let size = if style == Style::Display
-                && matches!(node, Math::Operator(op, _) if ["∑", "∏", "∐", "⋃", "⋂", "lim", "max", "min", "sup", "inf"].contains(&op.as_str()))
+            let variant = if style == Style::Display
+                && matches!(node, Math::Operator(op, _) if variant_operator(op))
+            {
+                larger_operator_variant(fonts, text)
+            } else {
+                None
+            };
+            let paint = if variant.is_some() {
+                size
+            } else if style == Style::Display
+                && matches!(node, Math::Operator(op, _) if scaled_operator(op))
             {
                 size * 1.4
             } else {
                 size
             };
-            let italic = matches!(node, Math::Text(_))
+            let italic = variant.is_none()
+                && matches!(node, Math::Text(_))
                 && text.chars().count() == 1
                 && text
                     .chars()
                     .any(|c| c.is_ascii_alphabetic() || ('α'..='ω').contains(&c));
-            let shaped =
-                fonts.shape(text, size, if italic { "italic" } else { "regular" }, false)?;
+            let shaped = if let Some(glyph) = &variant {
+                fonts.shape_glyph(glyph.id, paint, "math", text)?
+            } else {
+                fonts.shape(
+                    text,
+                    paint,
+                    if italic { "italic" } else { "regular" },
+                    false,
+                )?
+            };
+            let (ascent, descent) = if let Some(glyph) = &variant {
+                let scale = paint / glyph.upem;
+                (
+                    glyph.y_max as f32 * scale,
+                    (-glyph.y_min as f32 * scale).max(0.),
+                )
+            } else {
+                (paint * 0.85, paint * 0.22)
+            };
             let width = shaped.width;
             Ok(BoxLayout {
                 runs: vec![Run {
                     shaped,
                     x: 0.,
                     y: 0.,
-                    size,
+                    size: paint,
                     color,
                 }],
                 rules: vec![],
                 width,
-                ascent: size * 0.85,
-                descent: size * 0.22,
+                ascent,
+                descent,
                 backgrounds: vec![],
             })
         }
@@ -222,13 +521,15 @@ pub fn layout(
         }
         Math::Scripts { base, sub, sup } => {
             let limits = style == Style::Display
-                && matches!(base.as_ref(), Math::Operator(op, _) if ["∑", "∏", "∐", "⋃", "⋂", "lim", "max", "min", "sup", "inf"].contains(&op.as_str()));
+                && matches!(base.as_ref(), Math::Operator(op, _) if limit_operator(op));
+            let enlarge = style == Style::Display
+                && matches!(base.as_ref(), Math::Operator(op, _) if scaled_operator(op));
             let mut out = layout(
                 base,
                 fonts,
-                if limits { size * 1.4 } else { size },
+                size,
                 color,
-                Style::Text,
+                if enlarge { Style::Display } else { Style::Text },
             )?;
             if limits {
                 let lower = sub
@@ -449,21 +750,15 @@ pub fn layout(
         }
         Math::Fenced { open, close, body } => {
             let body = layout(body, fonts, size, color, style)?;
-            let delimiter_size = ((body.ascent + body.descent) / 1.07).max(size);
-            let left = layout(
-                &Math::operator(open.clone()),
-                fonts,
-                delimiter_size,
-                color,
-                Style::Text,
-            )?;
-            let right = layout(
-                &Math::operator(close.clone()),
-                fonts,
-                delimiter_size,
-                color,
-                Style::Text,
-            )?;
+            let target = body.ascent + body.descent;
+            let left = match stretch_delimiter(fonts, open, target, size, color)? {
+                Some(delimiter) => delimiter,
+                None => scaled_delimiter(fonts, open, &body, size, color)?,
+            };
+            let right = match stretch_delimiter(fonts, close, target, size, color)? {
+                Some(delimiter) => delimiter,
+                None => scaled_delimiter(fonts, close, &body, size, color)?,
+            };
             let mut out = BoxLayout {
                 width: left.width + body.width + right.width,
                 ascent: body.ascent,
@@ -560,12 +855,7 @@ mod regression_tests {
     }
     #[test]
     fn variables_are_italic_but_functions_and_digits_remain_upright() {
-        for command in [
-            r"\mathrm{x}",
-            r"\operatorname{f}",
-            r"\mathbf{x}",
-            r"\mathsf{x}",
-        ] {
+        for command in [r"\mathrm{x}", r"\operatorname{f}"] {
             assert_eq!(
                 draw(command, Style::Text).runs[0].shaped.glyphs[0].font,
                 0,
@@ -583,6 +873,13 @@ mod regression_tests {
             0
         );
         assert_eq!(draw(r"\sin", Style::Text).runs[0].shaped.glyphs[0].font, 0);
+        assert!(parse(r"\mathbf{x}").unwrap().mathml().contains('\u{1D431}'));
+        assert!(parse(r"\mathsf{A}").unwrap().mathml().contains('\u{1D5A0}'));
+        assert!(parse(r"\mathit{h}").unwrap().mathml().contains('\u{210E}'));
+        assert!(parse(r"\mathcal{L}").unwrap().mathml().contains('\u{2112}'));
+        let upright = parse(r"\operatorname{sin}").unwrap().mathml();
+        assert!(upright.contains("<mo>sin</mo>"));
+        assert!(!upright.contains('\u{1D460}'));
     }
     #[test]
     fn relations_and_binary_operators_have_spacing_but_unary_signs_do_not() {
@@ -615,5 +912,109 @@ mod regression_tests {
         let rendered = draw(r"\unknownpublisle{x}", Style::Text);
         assert_eq!(rendered.runs[0].color, [0.85, 0.05, 0.05]);
         assert!(rendered.runs.len() >= 2);
+    }
+
+    fn pinned_math_font() -> std::path::PathBuf {
+        let path = std::env::temp_dir().join("NotoSansMath-Regular.ttf");
+        let sha = "3f495fe933c06786e4d5f6d86b8ee70b6753a68ee3b9d87528726de0f6e2c47d";
+        let digest = |file: &std::path::Path| {
+            let output = std::process::Command::new("sha256sum")
+                .arg(file)
+                .output()
+                .unwrap();
+            String::from_utf8(output.stdout)
+                .unwrap()
+                .split_whitespace()
+                .next()
+                .unwrap()
+                .to_string()
+        };
+        if path.exists() && digest(&path) == sha {
+            return path;
+        }
+        let status = std::process::Command::new("curl")
+            .args([
+                "-fsSL",
+                "-o",
+                path.to_str().unwrap(),
+                "https://github.com/google/fonts/raw/dbd1ab6e65dc59bcda3ca8de9fd372f58f98e0af/ofl/notosansmath/NotoSansMath-Regular.ttf",
+            ])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert_eq!(digest(&path), sha);
+        path
+    }
+
+    fn math_fonts() -> Fonts {
+        let directory = std::path::PathBuf::from(
+            std::env::var_os("PUBLISLE_TEST_FONT_DIR").expect("Pinned test fonts required"),
+        );
+        Fonts::load(&[
+            FontSpec {
+                path: directory.join("DejaVuSerif.ttf"),
+                role: "regular".into(),
+                index: 0,
+            },
+            FontSpec {
+                path: directory.join("DejaVuSerif-Italic.ttf"),
+                role: "italic".into(),
+                index: 0,
+            },
+            FontSpec {
+                path: pinned_math_font(),
+                role: "math".into(),
+                index: 0,
+            },
+        ])
+        .unwrap()
+    }
+
+    fn draw_math(source: &str, style: Style) -> BoxLayout {
+        layout(
+            &parse(source).unwrap(),
+            &mut math_fonts(),
+            12.,
+            [0.; 3],
+            style,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn math_alphabets_and_delimiters_use_the_math_font() {
+        let mut fonts = math_fonts();
+        let shaped = layout(
+            &parse(r"\mathbf{x}").unwrap(),
+            &mut fonts,
+            12.,
+            [0.; 3],
+            Style::Text,
+        )
+        .unwrap();
+        let bold_x: String = shaped.runs[0]
+            .shaped
+            .glyphs
+            .iter()
+            .map(|glyph| {
+                fonts.fonts[glyph.font]
+                    .glyphs
+                    .iter()
+                    .find(|(_, cid)| **cid == glyph.cid)
+                    .unwrap()
+                    .0
+                    .unicode
+                    .clone()
+            })
+            .collect();
+        assert_eq!(bold_x, "\u{1D431}");
+        assert_eq!(shaped.runs[0].shaped.glyphs[0].font, 2);
+        let fenced = draw_math(r"\left(\frac{x}{y}\right)", Style::Display);
+        assert!((fenced.runs[0].size - 12.).abs() < 0.01);
+        assert_eq!(fenced.runs[0].shaped.glyphs[0].font, 2);
+        let display = draw_math(r"\sum", Style::Display);
+        let text = draw_math(r"\sum", Style::Text);
+        assert!((display.runs[0].size - 12.).abs() < 0.01);
+        assert!(display.ascent > text.ascent);
     }
 }

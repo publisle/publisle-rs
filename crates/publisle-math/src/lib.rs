@@ -730,34 +730,18 @@ impl Parser {
                 }
                 if self.input.get(self.cursor) != Some(&'{') {
                     let value = self.argument()?;
-                    return Ok(if command == "mathbb" {
-                        match value {
-                            Math::Text(text) => Math::Text(blackboard(&text)),
-                            other => other,
-                        }
-                    } else {
-                        value
+                    return Ok(match value {
+                        Math::Text(text) | Math::PlainText(text) => styled_alphabet(&command, text),
+                        other => other,
                     });
                 }
-                let mut text = self.group_text()?;
+                let text = self.group_text()?;
                 if text.contains('\\') || text.contains('{') {
                     return Err(
                         self.error("Nested commands in text/font arguments are unsupported.")
                     );
                 }
-                if command == "mathbb" {
-                    text = blackboard(&text);
-                }
-                Ok(if command == "operatorname" {
-                    Math::Operator(text, AtomClass::Op)
-                } else if matches!(
-                    command.as_str(),
-                    "text" | "textrm" | "mathrm" | "mathbf" | "mathsf"
-                ) {
-                    Math::PlainText(text)
-                } else {
-                    Math::Text(text)
-                })
+                Ok(styled_alphabet(&command, text))
             }
             "colorbox" | "fcolorbox" => {
                 let first = self.group_text()?;
@@ -945,6 +929,114 @@ fn blackboard(value: &str) -> String {
         .collect()
 }
 
+/// Map `\mathbf`, `\mathsf`, `\mathit`, `\mathcal`, and upright `\operatorname`
+/// onto the Mathematical Alphanumeric Symbols block. Operator names stay
+/// upright ASCII: that block has no separate upright serif alphabet.
+fn styled_alphabet(command: &str, text: String) -> Math {
+    let mapped = match command {
+        "mathbf" => map_math_alphabet(&text, Alphabet::Bold),
+        "mathsf" => map_math_alphabet(&text, Alphabet::Sans),
+        "mathit" => map_math_alphabet(&text, Alphabet::Italic),
+        "mathcal" => map_math_alphabet(&text, Alphabet::Script),
+        "mathbb" => blackboard(&text),
+        _ => text,
+    };
+    if command == "operatorname" {
+        Math::Operator(mapped, AtomClass::Op)
+    } else if matches!(command, "text" | "textrm" | "mathrm" | "mathbf" | "mathsf") {
+        Math::PlainText(mapped)
+    } else {
+        Math::Text(mapped)
+    }
+}
+
+enum Alphabet {
+    Bold,
+    Sans,
+    Italic,
+    Script,
+}
+
+fn map_math_alphabet(value: &str, alphabet: Alphabet) -> String {
+    value
+        .chars()
+        .map(|c| match alphabet {
+            Alphabet::Bold => math_bold(c),
+            Alphabet::Sans => math_sans(c),
+            Alphabet::Italic => math_italic(c),
+            Alphabet::Script => math_script(c),
+        })
+        .collect()
+}
+
+fn offset_char(base: u32, index: u32) -> char {
+    char::from_u32(base + index).unwrap_or('\u{FFFD}')
+}
+
+fn math_bold(c: char) -> char {
+    match c {
+        'A'..='Z' => offset_char(0x1D400, u32::from(c) - u32::from('A')),
+        'a'..='z' => offset_char(0x1D41A, u32::from(c) - u32::from('a')),
+        '0'..='9' => offset_char(0x1D7CE, u32::from(c) - u32::from('0')),
+        other => other,
+    }
+}
+
+fn math_sans(c: char) -> char {
+    match c {
+        'A'..='Z' => offset_char(0x1D5A0, u32::from(c) - u32::from('A')),
+        'a'..='z' => offset_char(0x1D5BA, u32::from(c) - u32::from('a')),
+        '0'..='9' => offset_char(0x1D7E2, u32::from(c) - u32::from('0')),
+        other => other,
+    }
+}
+
+fn math_italic(c: char) -> char {
+    match c {
+        'A'..='Z' => offset_char(0x1D434, u32::from(c) - u32::from('A')),
+        // U+1D455 is unassigned; italic h is U+210E.
+        'h' => '\u{210E}',
+        'a'..='z' => offset_char(0x1D44E, u32::from(c) - u32::from('a')),
+        other => other,
+    }
+}
+
+fn math_script(c: char) -> char {
+    match c {
+        'A' => '\u{1D49C}',
+        'B' => '\u{212C}',
+        'C' => '\u{1D49E}',
+        'D' => '\u{1D49F}',
+        'E' => '\u{2130}',
+        'F' => '\u{2131}',
+        'G' => '\u{1D4A2}',
+        'H' => '\u{210B}',
+        'I' => '\u{2110}',
+        'J' => '\u{1D4A5}',
+        'K' => '\u{1D4A6}',
+        'L' => '\u{2112}',
+        'M' => '\u{2133}',
+        'N' => '\u{1D4A9}',
+        'O' => '\u{1D4AA}',
+        'P' => '\u{1D4AB}',
+        'Q' => '\u{1D4AC}',
+        'R' => '\u{211B}',
+        'S' => '\u{1D4AE}',
+        'T' => '\u{1D4AF}',
+        'U' => '\u{1D4B0}',
+        'V' => '\u{1D4B1}',
+        'W' => '\u{1D4B2}',
+        'X' => '\u{1D4B3}',
+        'Y' => '\u{1D4B4}',
+        'Z' => '\u{1D4B5}',
+        'e' => '\u{212F}',
+        'g' => '\u{210A}',
+        'o' => '\u{2134}',
+        'a'..='z' => offset_char(0x1D4B6, u32::from(c) - u32::from('a')),
+        other => other,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -986,6 +1078,16 @@ mod tests {
         assert!(math.contains("<mtext>Residual energy</mtext>"));
         assert!(math.contains("<menclose"));
         assert!(math.contains("ℝ"));
+        assert!(parse(r"\mathbf{x9}").unwrap().mathml().contains("𝐱𝟗"));
+        assert!(parse(r"\mathsf{A1}").unwrap().mathml().contains("𝖠𝟣"));
+        assert!(parse(r"\mathit{hi}").unwrap().mathml().contains("ℎ𝑖"));
+        assert!(parse(r"\mathcal{B}").unwrap().mathml().contains("ℬ"));
+        assert!(
+            parse(r"\operatorname{sin}")
+                .unwrap()
+                .mathml()
+                .contains("<mo>sin</mo>")
+        );
         assert!(
             parse(r"\sqrt[3]{x}")
                 .unwrap()

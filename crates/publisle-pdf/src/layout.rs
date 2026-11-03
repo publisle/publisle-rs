@@ -3,7 +3,8 @@ use crate::{
     math::{self, BoxLayout},
     model::*,
 };
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use hyphenation::{Hyphenator, Language, Load, Standard};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use unicode_segmentation::UnicodeSegmentation;
 
 pub struct Layout {
@@ -129,6 +130,7 @@ struct Builder<'a> {
     warnings: Vec<Diagnostic>,
     warned_chars: BTreeSet<char>,
     overlong_warned: bool,
+    hyphenator: Option<Standard>,
 }
 pub fn build(input: &Input) -> Result<(Layout, Vec<Diagnostic>)> {
     if input.schema_version != 1 {
@@ -214,6 +216,9 @@ pub fn build(input: &Input) -> Result<(Layout, Vec<Diagnostic>)> {
         warnings: Vec::new(),
         warned_chars: BTreeSet::new(),
         overlong_warned: false,
+        hyphenator: Some(
+            Standard::from_embedded(Language::EnglishUS).expect("embedded English hyphenation"),
+        ),
     };
     builder.index_references();
     builder.new_page()?;
@@ -576,6 +581,74 @@ impl Builder<'_> {
         }
         Ok(())
     }
+    fn content_bottom(&self) -> f32 {
+        self.bottom_margin
+            + if self.rendering_notes {
+                0.
+            } else {
+                self.note_reservations
+                    .get(&(self.active_page, self.column))
+                    .copied()
+                    .unwrap_or(0.)
+            }
+    }
+    fn fits_here(&self, height: f32) -> bool {
+        self.cursor - height >= self.content_bottom()
+    }
+    /// Move to the next column, or the next page, without placing a line.
+    fn break_region(&mut self) -> Result<()> {
+        if self.column + 1 < self.columns {
+            self.column += 1;
+            self.cursor = self.column_top;
+            Ok(())
+        } else {
+            self.new_page()
+        }
+    }
+    fn line_span(
+        &mut self,
+        line: &[Piece],
+        size: f32,
+    ) -> Result<(f32, f32, f32, Vec<(usize, f32)>)> {
+        let ascent = line
+            .iter()
+            .map(|piece| piece.ascent)
+            .fold(size * 0.9, f32::max);
+        let descent = line
+            .iter()
+            .map(|piece| piece.descent)
+            .fold(size * 0.25, f32::max);
+        let text_height = (ascent + descent).max(size * self.leading);
+        let notes = if self.rendering_notes {
+            vec![]
+        } else {
+            self.line_notes(line)?
+        };
+        let needed = text_height + notes.iter().map(|(_, height)| *height).sum::<f32>();
+        Ok((ascent, descent, needed, notes))
+    }
+    /// Keep at least two lines of a paragraph on each side of a page break.
+    /// Paragraphs shorter than four lines stay greedy.
+    fn keep_paragraph_lines(
+        &mut self,
+        line_count: usize,
+        line_index: usize,
+        lines_here: &mut usize,
+        needed: f32,
+        next: f32,
+    ) -> Result<()> {
+        if self.cursor + 0.01 >= self.column_top {
+            return Ok(());
+        }
+        let orphan = *lines_here == 0 && self.fits_here(needed) && !self.fits_here(needed + next);
+        let widow =
+            line_count - line_index == 2 && *lines_here >= 2 && !self.fits_here(needed + next);
+        if orphan || widow {
+            self.break_region()?;
+            *lines_here = 0;
+        }
+        Ok(())
+    }
     fn draw(&mut self, tag: Option<usize>, x: f32, y: f32, kind: DrawKind) {
         self.output.pages[self.active_page]
             .draws
@@ -915,22 +988,37 @@ impl Builder<'_> {
         rest_indent: f32,
     ) -> Result<()> {
         let width = self.width() - first_indent.max(rest_indent);
-        let lines = self.lines(inlines, size, role, width)?;
-        for (line_index, line) in lines.into_iter().enumerate() {
+        let mut lines = self.lines(inlines, size, role, width)?;
+        let line_count = lines.len();
+        let mut lines_here = 0usize;
+        for line_index in 0..line_count {
             let indent = if line_index == 0 {
                 first_indent
             } else {
                 rest_indent
             };
-            let ascent = line.iter().map(|p| p.ascent).fold(size * 0.9, f32::max);
-            let descent = line.iter().map(|p| p.descent).fold(size * 0.25, f32::max);
-            let height = (ascent + descent).max(size * self.leading);
-            let notes = if self.rendering_notes {
-                vec![]
+            let available = width - indent;
+            if !self.centered && line_index + 1 != line_count {
+                justify_line(&mut lines[line_index], available);
+            }
+            let next_needed = if line_count >= 4 && line_index + 1 < line_count {
+                Some(self.line_span(&lines[line_index + 1], size)?.2)
             } else {
-                self.line_notes(&line)?
+                None
             };
-            self.ensure(height + notes.iter().map(|(_, h)| h).sum::<f32>())?;
+            let (ascent, descent, needed, notes) = self.line_span(&lines[line_index], size)?;
+            if let Some(next) = next_needed
+                && !self.rendering_notes
+            {
+                self.keep_paragraph_lines(line_count, line_index, &mut lines_here, needed, next)?;
+            }
+            let before = (self.active_page, self.column);
+            self.ensure(needed)?;
+            if (self.active_page, self.column) != before {
+                lines_here = 0;
+            }
+            let line = std::mem::take(&mut lines[line_index]);
+            let height = (ascent + descent).max(size * self.leading);
             for (index, note_height) in notes {
                 self.scheduled_notes.insert(index);
                 *self
@@ -1000,6 +1088,7 @@ impl Builder<'_> {
                 }
             }
             self.cursor -= height - ascent;
+            lines_here += 1;
         }
         self.cursor -= size * 0.45;
         Ok(())
@@ -1118,9 +1207,22 @@ impl Builder<'_> {
         width: f32,
     ) -> Result<Vec<Vec<Piece>>> {
         let pieces = self.pieces(inlines, size, role)?;
-        let (lines, broke) = wrap(pieces, width, &mut |text, size, role, rtl| {
-            self.shape_checked(text, size, role, rtl)
-        })?;
+        let english = self.input.article.language.split('-').next() == Some("en");
+        let mut hyphenator = if english {
+            self.hyphenator.take()
+        } else {
+            None
+        };
+        let wrapped = wrap(
+            pieces,
+            width,
+            hyphenator.as_ref(),
+            &mut |text, size, role, rtl| self.shape_checked(text, size, role, rtl),
+        );
+        if english {
+            self.hyphenator = hyphenator.take();
+        }
+        let (lines, broke) = wrapped?;
         if broke {
             self.warn_overlong_word();
         }
@@ -1521,13 +1623,11 @@ impl Builder<'_> {
                     self.figures,
                     caption,
                 );
-                // Short captions centre under the figure; long ones wrap left.
-                let fits = self
-                    .lines(&text, 9., "regular", self.width())
-                    .map(|lines| lines.len() == 1)
-                    .unwrap_or(false);
+                // Every caption line stays centred, including wrapped lines.
+                // Inline math is laid out in text style (italic letters and
+                // inter-atom spacing) by paragraph(), not as upright prose.
                 let centered = self.centered;
-                self.centered = fits;
+                self.centered = true;
                 self.paragraph(&text, 9., "regular", tag, 0.)?;
                 self.centered = centered;
             }
@@ -1549,12 +1649,8 @@ impl Builder<'_> {
                     self.tables,
                     caption,
                 );
-                let fits = self
-                    .lines(&text, 9., "regular", self.width())
-                    .map(|lines| lines.len() == 1)
-                    .unwrap_or(false);
                 let centered = self.centered;
-                self.centered = fits;
+                self.centered = true;
                 self.paragraph(&text, 9., "regular", tag, 0.)?;
                 self.centered = centered;
                 let cols = rows.first().map(Vec::len).unwrap_or(0);
@@ -1921,7 +2017,143 @@ where
     Ok(chunks)
 }
 
-fn wrap<F>(pieces: Vec<Piece>, width: f32, measure: &mut F) -> Result<(Vec<Vec<Piece>>, bool)>
+fn justify_line(line: &mut [Piece], available: f32) {
+    let used = line.iter().map(|piece| piece.width).sum::<f32>();
+    let extra = available - used;
+    if extra <= 0.5 {
+        return;
+    }
+    let gaps: Vec<usize> = line
+        .iter()
+        .enumerate()
+        .filter_map(|(index, piece)| {
+            if index + 1 == line.len() {
+                return None;
+            }
+            let PieceKind::Text { text, .. } = &piece.kind else {
+                return None;
+            };
+            text.chars().any(char::is_whitespace).then_some(index)
+        })
+        .collect();
+    if gaps.is_empty() {
+        return;
+    }
+    let share = extra / gaps.len() as f32;
+    for index in gaps {
+        line[index].width += share;
+    }
+}
+
+enum Placed {
+    One(Piece),
+    Two(Piece, Piece),
+}
+
+fn ascii_word_len(text: &str) -> Option<usize> {
+    let word_len = text.trim_end_matches(char::is_whitespace).len();
+    let word = &text[..word_len];
+    if word.chars().count() < 4
+        || !word
+            .chars()
+            .all(|character| character.is_ascii_alphabetic())
+    {
+        return None;
+    }
+    text[word_len..]
+        .chars()
+        .all(char::is_whitespace)
+        .then_some(word_len)
+}
+
+fn piece_from(source: &Piece, text: String, shaped: Shaped, break_after: bool) -> Piece {
+    let PieceKind::Text {
+        link,
+        target,
+        strike,
+        ..
+    } = &source.kind
+    else {
+        unreachable!("hyphenation only splits text");
+    };
+    Piece {
+        width: shaped.width,
+        size: source.size,
+        ascent: source.ascent,
+        descent: source.descent,
+        raise: source.raise,
+        kind: PieceKind::Text {
+            shaped,
+            text,
+            link: link.clone(),
+            target: target.clone(),
+            strike: *strike,
+        },
+        break_after,
+        role: source.role.clone(),
+        rtl: source.rtl,
+    }
+}
+
+/// Split an ASCII word at the last English hyphen point whose prefix fits.
+fn hyphenate_piece<F>(
+    piece: Piece,
+    limit: f32,
+    hyphenator: Option<&Standard>,
+    measure: &mut F,
+) -> Result<Placed>
+where
+    F: FnMut(&str, f32, &str, bool) -> Result<Shaped>,
+{
+    let Some(hyphenator) = hyphenator else {
+        return Ok(Placed::One(piece));
+    };
+    if piece.rtl || piece.role == "mono" || !matches!(piece.kind, PieceKind::Text { .. }) {
+        return Ok(Placed::One(piece));
+    }
+    let text = match &piece.kind {
+        PieceKind::Text { text, .. } => text.clone(),
+        _ => return Ok(Placed::One(piece)),
+    };
+    let Some(word_len) = ascii_word_len(&text) else {
+        return Ok(Placed::One(piece));
+    };
+    let word = &text[..word_len];
+    let mut chosen: Option<(usize, Shaped)> = None;
+    for index in hyphenator.hyphenate(word).breaks {
+        if index == 0 || index >= word.len() || !word.is_char_boundary(index) {
+            continue;
+        }
+        let prefix = format!("{}-", &word[..index]);
+        let shaped = measure(&prefix, piece.size, &piece.role, false)?;
+        if fits(shaped.width, limit) {
+            chosen = Some((index, shaped));
+        }
+    }
+    let Some((index, head_shaped)) = chosen else {
+        return Ok(Placed::One(piece));
+    };
+    let head_text = format!("{}-", &word[..index]);
+    let tail_text = format!("{}{}", &word[index..], &text[word_len..]);
+    if tail_text.trim_end_matches(char::is_whitespace).is_empty() {
+        return Ok(Placed::One(piece));
+    }
+    let tail_shaped = measure(&tail_text, piece.size, &piece.role, false)?;
+    let break_after = piece.break_after;
+    let head = piece_from(&piece, head_text, head_shaped, true);
+    let tail = piece_from(&piece, tail_text, tail_shaped, break_after);
+    if head.width > limit {
+        return Ok(Placed::One(piece));
+    }
+    Ok(Placed::Two(head, tail))
+}
+
+fn wrap<F>(
+    pieces: Vec<Piece>,
+    width: f32,
+    hyphenator: Option<&Standard>,
+    measure: &mut F,
+) -> Result<(Vec<Vec<Piece>>, bool)>
 where
     F: FnMut(&str, f32, &str, bool) -> Result<Shaped>,
 {
@@ -1929,44 +2161,66 @@ where
     let mut line = vec![];
     let mut used = 0.;
     let mut broke = false;
-    for piece in pieces {
+    let mut queue: VecDeque<Piece> = pieces.into();
+    while let Some(piece) = queue.pop_front() {
         if matches!(piece.kind, PieceKind::Break) {
             lines.push(std::mem::take(&mut line));
             used = 0.;
             continue;
         }
-        let fragments = if piece.width > width {
-            match &piece.kind {
-                PieceKind::Text { .. } => {
-                    let chunks = split_text_piece(piece, width, measure)?;
-                    broke = true;
-                    chunks
+        if piece.width > width {
+            match hyphenate_piece(piece, width, hyphenator, measure)? {
+                Placed::Two(head, tail) => {
+                    queue.push_front(tail);
+                    queue.push_front(head);
+                    continue;
                 }
-                _ => return Err(span_overflow()),
+                Placed::One(piece) => match piece.kind {
+                    PieceKind::Text { .. } => {
+                        broke = true;
+                        let mut chunks = split_text_piece(piece, width, measure)?;
+                        chunks.reverse();
+                        for chunk in chunks {
+                            queue.push_front(chunk);
+                        }
+                        continue;
+                    }
+                    _ => return Err(span_overflow()),
+                },
             }
-        } else {
-            vec![piece]
-        };
-        for piece in fragments {
-            if piece.width > width {
-                return Err(span_overflow());
-            }
-            if used + piece.width > width && !line.is_empty() {
-                let split = line
-                    .iter()
-                    .rposition(|p: &Piece| p.break_after)
-                    .map(|i| i + 1)
-                    .ok_or_else(group_overflow)?;
-                let carry = line.split_off(split);
-                lines.push(std::mem::replace(&mut line, carry));
-                used = line.iter().map(|p| p.width).sum();
-                if used + piece.width > width {
-                    return Err(group_overflow());
+        }
+        if used + piece.width > width && !line.is_empty() {
+            let piece = if piece.break_after {
+                match hyphenate_piece(piece, width - used, hyphenator, measure)? {
+                    Placed::Two(head, tail) => {
+                        line.push(head);
+                        lines.push(std::mem::take(&mut line));
+                        used = 0.;
+                        queue.push_front(tail);
+                        continue;
+                    }
+                    Placed::One(piece) => piece,
                 }
+            } else {
+                piece
+            };
+            let split = line
+                .iter()
+                .rposition(|candidate: &Piece| candidate.break_after)
+                .map(|index| index + 1)
+                .ok_or_else(group_overflow)?;
+            let carry = line.split_off(split);
+            lines.push(std::mem::replace(&mut line, carry));
+            used = line.iter().map(|candidate| candidate.width).sum();
+            if used + piece.width > width {
+                return Err(group_overflow());
             }
             used += piece.width;
             line.push(piece);
+            continue;
         }
+        used += piece.width;
+        line.push(piece);
     }
     if !line.is_empty() {
         lines.push(line);
@@ -2223,16 +2477,21 @@ mod bidi_tests {
         let mut dot = piece(".");
         dot.width = 3.;
         dot.break_after = false;
-        let lines = wrap(vec![prefix, equation, dot], 100., &mut unmeasured_shape)
-            .unwrap()
-            .0;
+        let lines = wrap(
+            vec![prefix, equation, dot],
+            100.,
+            None,
+            &mut unmeasured_shape,
+        )
+        .unwrap()
+        .0;
         assert_eq!(lines.iter().map(Vec::len).collect::<Vec<_>>(), vec![1, 2]);
     }
     #[test]
     fn cannot_break_inside_styled_words() {
         let mut first = piece("unbreak");
         first.break_after = false;
-        assert!(wrap(vec![first, piece("able")], 15., &mut unmeasured_shape).is_err());
+        assert!(wrap(vec![first, piece("able")], 15., None, &mut unmeasured_shape).is_err());
     }
     #[test]
     fn wide_math_is_still_layout_overflow() {
@@ -2247,7 +2506,7 @@ mod bidi_tests {
             role: String::new(),
             rtl: false,
         };
-        match wrap(vec![equation], 10., &mut unmeasured_shape) {
+        match wrap(vec![equation], 10., None, &mut unmeasured_shape) {
             Err(error) => assert_eq!(error.code, "layout-overflow"),
             Ok(_) => panic!("wide math should still overflow"),
         }
@@ -2337,6 +2596,7 @@ mod gap_regressions {
         let mut input = article_input(&directory(), serde_json::json!(blocks));
         input.pdf_standard = Some("ua-1".into());
         let (bytes, _) = crate::compile(&input).unwrap();
+        assert!(bytes.starts_with(b"%PDF-1.7\n"));
         let doc = lopdf::Document::load_mem(&bytes).unwrap();
         let dict = |id| doc.get_object(id).unwrap().as_dict().unwrap();
         let root = dict(doc.trailer.get(b"Root").unwrap().as_reference().unwrap());
@@ -2439,6 +2699,43 @@ mod gap_regressions {
         assert!(root.get(b"PageMode").is_err());
     }
 
+    #[cfg(feature = "pdf-import")]
+    #[test]
+    fn text_runs_use_tj_and_objects_share_a_compressed_xref() {
+        let input = article_input(
+            &directory(),
+            serde_json::json!([
+                {"kind":"paragraph","inlines":[{"type":"text","value":"Packed text stays readable."}]}
+            ]),
+        );
+        let (bytes, _) = crate::compile(&input).unwrap();
+        assert!(bytes.starts_with(b"%PDF-2.0\n"));
+        assert!(bytes.windows(6).any(|window| window == b"ObjStm"));
+        assert!(bytes.windows(4).any(|window| window == b"XRef"));
+        let doc = lopdf::Document::load_mem(&bytes).unwrap();
+        let text = doc.extract_text(&[1]).unwrap();
+        let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            flat.contains("Packed text stays readable."),
+            "extracted {text:?}"
+        );
+        let root = doc
+            .get_object(doc.trailer.get(b"Root").unwrap().as_reference().unwrap())
+            .unwrap()
+            .as_dict()
+            .unwrap();
+        let tree = doc
+            .get_object(root.get(b"StructTreeRoot").unwrap().as_reference().unwrap())
+            .unwrap()
+            .as_dict()
+            .unwrap();
+        assert!(tree.get(b"K").is_ok());
+        let page_id = *doc.get_pages().get(&1).unwrap();
+        let content = lopdf::content::Content::decode(&doc.get_page_content(page_id)).unwrap();
+        assert!(content.operations.iter().any(|op| op.operator == "TJ"));
+        assert!(content.operations.iter().all(|op| op.operator != "Tj"));
+    }
+
     fn font(directory: &std::path::Path) -> serde_json::Value {
         serde_json::json!({"path": directory.join("DejaVuSerif.ttf"), "role": "regular"})
     }
@@ -2477,6 +2774,87 @@ mod gap_regressions {
             layout.keywords,
             vec!["crisp".to_string(), "typesetting".to_string()]
         );
+    }
+
+    #[test]
+    fn english_paragraphs_justify_and_hyphenate_but_arabic_does_not() {
+        let sentence = "The extraordinary internationalization of typography requires careful hyphenation whenever a single long word cannot fit. ";
+        let value = format!("{}{}", sentence.repeat(4), "internationalization".repeat(8));
+        let blocks = serde_json::json!([{
+            "kind": "paragraph",
+            "inlines": [{"type": "text", "value": value}]
+        }]);
+        let (layout, _) = build(&article_input(&directory(), blocks)).unwrap();
+        let body = crate::profiles::profile("article").unwrap().body_size;
+        let mut rows: std::collections::BTreeMap<(usize, i32), Vec<(f32, f32, bool)>> =
+            std::collections::BTreeMap::new();
+        let mut hyphenated = false;
+        for (page_index, page) in layout.pages.iter().enumerate() {
+            for draw in &page.draws {
+                if let DrawKind::Text {
+                    text, shaped, size, ..
+                } = &draw.kind
+                {
+                    if (*size - body).abs() > 0.01 {
+                        continue;
+                    }
+                    if text.contains('-') {
+                        hyphenated = true;
+                    }
+                    rows.entry((page_index, -((draw.y * 10.).round() as i32)))
+                        .or_default()
+                        .push((draw.x, shaped.width, text.chars().any(char::is_whitespace)));
+                }
+            }
+        }
+        let lines: Vec<_> = rows.into_values().collect();
+        assert!(lines.len() >= 3, "expected a wrapped paragraph");
+        let end = |line: &[(f32, f32, bool)]| {
+            line.iter()
+                .map(|(x, width, _)| x + width)
+                .fold(0., f32::max)
+        };
+        let spaced: Vec<_> = lines
+            .iter()
+            .filter(|line| line.iter().any(|(_, _, space)| *space))
+            .collect();
+        assert!(spaced.len() >= 2, "expected several spaced lines");
+        let last = lines.last().unwrap();
+        let full = spaced
+            .iter()
+            .filter(|line| !std::ptr::eq(line.as_slice(), last.as_slice()))
+            .map(|line| end(line))
+            .fold(0., f32::max);
+        for line in &spaced {
+            if std::ptr::eq(line.as_slice(), last.as_slice()) {
+                continue;
+            }
+            assert!(
+                (end(line) - full).abs() < 1.5,
+                "a non-final line is not justified"
+            );
+        }
+        assert!(end(last) + 12. < full, "the last line was stretched");
+        assert!(hyphenated, "an English paragraph did not hyphenate");
+
+        let arabic = "هذا نص عربي طويل بدون شرطة ويتكرر لكي يلتف على أكثر من سطر واحد في العمود. ";
+        let mut input = article_input(
+            &directory(),
+            serde_json::json!([{
+                "kind": "paragraph",
+                "inlines": [{"type": "text", "value": format!("{arabic}{}", "internationalization".repeat(4))}]
+            }]),
+        );
+        input.article.language = "ar".into();
+        input.article.direction = Some("rtl".into());
+        let (layout, _) = build(&input).unwrap();
+        for page in &layout.pages {
+            for draw in &page.draws {
+                if let DrawKind::Text { text, .. } = &draw.kind {
+                    assert!(!text.contains('-'), "Arabic text was hyphenated: {text}");
+                }
+            }
+        }
     }
 
     #[test]
@@ -2558,16 +2936,24 @@ mod gap_regressions {
         ]}]);
         let (layout, warnings) = build(&article_input(&directory(), blocks)).unwrap();
         let joined = draw_text(&layout);
+        let recovered: String = joined
+            .chars()
+            .filter(|character| *character != '-')
+            .collect();
         assert!(
-            joined.contains(&long),
-            "expected the full cell after an emergency break, got {joined}"
+            recovered.contains(&long),
+            "expected the full cell after hyphenation, got {joined}"
+        );
+        assert!(
+            joined.contains('-'),
+            "a word wider than the cell should hyphenate before a grapheme split"
         );
         let sizes: Vec<f32> = layout
             .pages
             .iter()
             .flat_map(|page| &page.draws)
             .filter_map(|draw| match &draw.kind {
-                DrawKind::Text { size, text, .. } if long.contains(text) => Some(*size),
+                DrawKind::Text { size, text, .. } if text.contains("unbreak") => Some(*size),
                 _ => None,
             })
             .collect();
@@ -2577,8 +2963,8 @@ mod gap_regressions {
             "table text must not shrink below 0.6, got {sizes:?}"
         );
         assert!(
-            warnings.iter().any(|d| d.code == "overlong-word-broken"),
-            "expected an emergency-break warning, got {warnings:?}"
+            warnings.iter().all(|d| d.code != "overlong-word-broken"),
+            "hyphenation should fit the cell before a grapheme split, got {warnings:?}"
         );
     }
 
@@ -3001,5 +3387,130 @@ mod gap_regressions {
                 "{absent} should not be painted, got {painted}"
             );
         }
+    }
+
+    #[test]
+    fn wrapped_captions_stay_centred_and_inline_math_is_spaced() {
+        let directory = directory();
+        let filler = "measured caption text ".repeat(12);
+        let blocks = serde_json::json!([{
+            "kind":"table",
+            "headerRows":0,
+            "caption":[
+                {"type":"text","value": filler},
+                {"type":"math","value":"x+y"},
+                {"type":"text","value":" END"}
+            ],
+            "rows":[[[{"type":"text","value":"cell"}]]]
+        }]);
+        let input: Input = serde_json::from_value(serde_json::json!({
+            "schemaVersion": 1,
+            "template": "article",
+            "templateVersion": "1",
+            "article": {"title": "Captions", "authors": ["Ada"], "blocks": blocks},
+            "citations": [],
+            "bibliography": [],
+            "assets": [],
+            "fonts": [
+                {"path": directory.join("DejaVuSerif.ttf"), "role": "regular"},
+                {"path": directory.join("DejaVuSerif-Italic.ttf"), "role": "italic"}
+            ]
+        }))
+        .unwrap();
+        let (layout, _) = build(&input).unwrap();
+        let in_caption = |tag: Option<usize>| {
+            let mut current = tag;
+            while let Some(index) = current {
+                if layout.tags[index].role == "Caption" {
+                    return true;
+                }
+                current = layout.tags[index].parent;
+            }
+            false
+        };
+        let mut rows: std::collections::BTreeMap<i32, (f32, f32)> =
+            std::collections::BTreeMap::new();
+        let mut math_box = None;
+        for page in &layout.pages {
+            for draw in &page.draws {
+                if !in_caption(draw.tag) {
+                    continue;
+                }
+                match &draw.kind {
+                    DrawKind::Text { shaped, .. } => {
+                        let row = rows
+                            .entry(draw.y.round() as i32)
+                            .or_insert((draw.x, draw.x));
+                        row.0 = row.0.min(draw.x);
+                        row.1 = row.1.max(draw.x + shaped.width);
+                    }
+                    DrawKind::Math(boxed) => {
+                        let row = rows
+                            .entry(draw.y.round() as i32)
+                            .or_insert((draw.x, draw.x));
+                        row.0 = row.0.min(draw.x);
+                        row.1 = row.1.max(draw.x + boxed.width);
+                        math_box = Some(boxed.clone());
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let widths: Vec<(f32, f32)> = rows
+            .values()
+            .map(|(start, end)| (*start, end - start))
+            .collect();
+        assert!(widths.len() >= 2, "caption should wrap, got {widths:?}");
+        let widest = widths.iter().map(|(_, width)| *width).fold(0f32, f32::max);
+        for (start, width) in &widths {
+            if widest - width > 20. {
+                let widest_start = widths
+                    .iter()
+                    .find(|(_, item)| (widest - item).abs() < 0.5)
+                    .unwrap()
+                    .0;
+                assert!(
+                    *start > widest_start + 4.,
+                    "shorter caption line should stay centred: {widths:?}"
+                );
+            }
+        }
+        let boxed = math_box.expect("caption inline math");
+        assert_eq!(
+            boxed.runs[0].shaped.glyphs[0].font, 1,
+            "caption math should be italic"
+        );
+        let mut fonts = crate::fonts::Fonts::load(&[
+            FontSpec {
+                path: directory.join("DejaVuSerif.ttf"),
+                role: "regular".into(),
+                index: 0,
+            },
+            FontSpec {
+                path: directory.join("DejaVuSerif-Italic.ttf"),
+                role: "italic".into(),
+                index: 0,
+            },
+        ])
+        .unwrap();
+        let tight = ["x", "+", "y"]
+            .iter()
+            .map(|source| {
+                math::layout(
+                    &math::parse(source).unwrap(),
+                    &mut fonts,
+                    9.,
+                    [0.; 3],
+                    math::Style::Text,
+                )
+                .unwrap()
+                .width
+            })
+            .sum::<f32>();
+        assert!(
+            boxed.width > tight + 0.5,
+            "caption math should keep operator spacing: {} vs {tight}",
+            boxed.width
+        );
     }
 }
