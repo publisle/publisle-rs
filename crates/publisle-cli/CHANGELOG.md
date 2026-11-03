@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7](https://github.com/publisle/publisle-rs/compare/publisle-cli-v0.1.6...publisle-cli-v0.1.7) - 2026-11-03
+
+### Other
+
+- ignore resvg bumps until svg2pdf moves ([#45](https://github.com/publisle/publisle-rs/pull/45))
+
 ## [0.1.6](https://github.com/publisle/publisle-rs/compare/publisle-cli-v0.1.5...publisle-cli-v0.1.6) - 2026-10-29
 
 ### Other
