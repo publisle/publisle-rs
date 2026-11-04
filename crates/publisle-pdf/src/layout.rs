@@ -71,6 +71,8 @@ pub enum DrawKind {
         draw_height: f32,
     },
 }
+/// Ascent, descent, the height the line needs, and each footnote's height.
+type LineSpan = (f32, f32, f32, Vec<(usize, f32)>);
 struct Piece {
     kind: PieceKind,
     width: f32,
@@ -605,11 +607,7 @@ impl Builder<'_> {
             self.new_page()
         }
     }
-    fn line_span(
-        &mut self,
-        line: &[Piece],
-        size: f32,
-    ) -> Result<(f32, f32, f32, Vec<(usize, f32)>)> {
+    fn line_span(&mut self, line: &[Piece], size: f32) -> Result<LineSpan> {
         let ascent = line
             .iter()
             .map(|piece| piece.ascent)
@@ -2778,6 +2776,7 @@ mod gap_regressions {
 
     #[test]
     fn english_paragraphs_justify_and_hyphenate_but_arabic_does_not() {
+        type JustifiedRows = std::collections::BTreeMap<(usize, i32), Vec<(f32, f32, bool)>>;
         let sentence = "The extraordinary internationalization of typography requires careful hyphenation whenever a single long word cannot fit. ";
         let value = format!("{}{}", sentence.repeat(4), "internationalization".repeat(8));
         let blocks = serde_json::json!([{
@@ -2786,8 +2785,7 @@ mod gap_regressions {
         }]);
         let (layout, _) = build(&article_input(&directory(), blocks)).unwrap();
         let body = crate::profiles::profile("article").unwrap().body_size;
-        let mut rows: std::collections::BTreeMap<(usize, i32), Vec<(f32, f32, bool)>> =
-            std::collections::BTreeMap::new();
+        let mut rows = JustifiedRows::new();
         let mut hyphenated = false;
         for (page_index, page) in layout.pages.iter().enumerate() {
             for draw in &page.draws {

@@ -28,41 +28,44 @@ impl Ids {
 fn font_name(index: usize) -> String {
     format!("F{index}")
 }
+struct TextPaint<'a> {
+    shaped: &'a Shaped,
+    size: f32,
+    position: [f32; 2],
+    color: [f32; 3],
+}
 fn text(
     content: &mut Content,
     fonts: &crate::fonts::Fonts,
     advances: &mut AdvanceCache,
-    shaped: &Shaped,
-    size: f32,
-    position: [f32; 2],
-    color: [f32; 3],
+    paint: &TextPaint<'_>,
     cff_cids: &BTreeMap<(usize, u16), u16>,
 ) {
-    if shaped.glyphs.is_empty() {
+    if paint.shaped.glyphs.is_empty() {
         return;
     }
-    content.set_fill_rgb(color[0], color[1], color[2]);
+    content.set_fill_rgb(paint.color[0], paint.color[1], paint.color[2]);
     content.begin_text();
     // Emit positioned characters in visual order. Geometry-based readers then
     // apply bidi once to the whole word, including its combining marks. The
     // structure tree retains the authored logical text and reading order.
     // One TJ run covers a font and baseline; the adjustment undoes the font
     // width so the next glyph lands on its shaped x.
-    let mut glyphs: Vec<_> = shaped.glyphs.iter().collect();
+    let mut glyphs: Vec<_> = paint.shaped.glyphs.iter().collect();
     glyphs.sort_by(|a, b| a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y)));
     let mut index = 0;
     while index < glyphs.len() {
         let font = glyphs[index].font;
         let y = glyphs[index].y;
         let name = font_name(font);
-        content.set_font(Name(name.as_bytes()), size);
+        content.set_font(Name(name.as_bytes()), paint.size);
         content.set_text_matrix([
             1.,
             0.,
             0.,
             1.,
-            position[0] + glyphs[index].x,
-            position[1] + y,
+            paint.position[0] + glyphs[index].x,
+            paint.position[1] + y,
         ]);
         let start = index;
         let mut pen = glyphs[index].x;
@@ -76,7 +79,7 @@ fn text(
             if index > start {
                 let delta = glyph.x - pen;
                 if delta.abs() > 0.01 {
-                    items.adjust(-delta * 1000. / size);
+                    items.adjust(-delta * 1000. / paint.size);
                 }
             }
             let cid = cff_cids
@@ -85,7 +88,7 @@ fn text(
                 .unwrap_or(glyph.cid);
             let encoded = cid.to_be_bytes();
             items.show(Str(&encoded));
-            pen = glyph.x + advances.advance(fonts, glyph, size);
+            pen = glyph.x + advances.advance(fonts, glyph, paint.size);
             index += 1;
         }
     }
@@ -505,10 +508,12 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
                         &mut content,
                         &layout.fonts,
                         &mut advances,
-                        shaped,
-                        *size,
-                        [draw.x, draw.y],
-                        [0.; 3],
+                        &TextPaint {
+                            shaped,
+                            size: *size,
+                            position: [draw.x, draw.y],
+                            color: [0.; 3],
+                        },
                         &cff_cids,
                     );
                     if link.is_some() || target.is_some() {
@@ -627,10 +632,12 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
                             &mut content,
                             &layout.fonts,
                             &mut advances,
-                            &run.shaped,
-                            run.size,
-                            [draw.x + run.x, draw.y + run.y],
-                            run.color,
+                            &TextPaint {
+                                shaped: &run.shaped,
+                                size: run.size,
+                                position: [draw.x + run.x, draw.y + run.y],
+                                color: run.color,
+                            },
                             &cff_cids,
                         );
                     }
