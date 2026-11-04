@@ -885,7 +885,7 @@ dependencies = [
 
 [[package]]
 name = "publisle"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "publisle-math",
  "publisle-pdf",
@@ -893,7 +893,7 @@ dependencies = [
 
 [[package]]
 name = "publisle-cli"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -904,14 +904,14 @@ dependencies = [
 
 [[package]]
 name = "publisle-math"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "publisle-pdf"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "flate2",
  "hyphenation",
