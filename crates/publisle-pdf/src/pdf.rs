@@ -1143,7 +1143,18 @@ fn slice_object(pdf: &[u8], start: usize) -> Result<(Vec<u8>, bool)> {
         body_at += 1;
     }
     if !pdf[body_at..].starts_with(b"<<") {
-        return Err(pdf_err("expected a dictionary object"));
+        // Object streams in this writer pack dictionaries only. An array, such
+        // as a structure-tree /K, stays a normal object instead of failing.
+        let endobj = pdf[body_at..]
+            .windows(6)
+            .position(|window| window == b"endobj")
+            .ok_or_else(|| pdf_err("missing endobj"))?
+            + body_at;
+        let mut end = endobj + b"endobj".len();
+        if pdf.get(end) == Some(&b'\n') {
+            end += 1;
+        }
+        return Ok((pdf[start..end].to_vec(), true));
     }
     let dict_end = scan_dict(pdf, body_at)?;
     if let Some(data_at) = stream_data_at(pdf, dict_end) {
