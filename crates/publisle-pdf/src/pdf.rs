@@ -28,37 +28,114 @@ impl Ids {
 fn font_name(index: usize) -> String {
     format!("F{index}")
 }
-fn text(
-    content: &mut Content,
-    shaped: &Shaped,
+struct TextPaint<'a> {
+    shaped: &'a Shaped,
     size: f32,
     position: [f32; 2],
     color: [f32; 3],
+}
+fn text(
+    content: &mut Content,
+    fonts: &crate::fonts::Fonts,
+    advances: &mut AdvanceCache,
+    paint: &TextPaint<'_>,
     cff_cids: &BTreeMap<(usize, u16), u16>,
 ) {
-    content.set_fill_rgb(color[0], color[1], color[2]);
+    if paint.shaped.glyphs.is_empty() {
+        return;
+    }
+    content.set_fill_rgb(paint.color[0], paint.color[1], paint.color[2]);
     content.begin_text();
-    let mut font = usize::MAX;
     // Emit positioned characters in visual order. Geometry-based readers then
     // apply bidi once to the whole word, including its combining marks. The
     // structure tree retains the authored logical text and reading order.
-    let mut glyphs: Vec<_> = shaped.glyphs.iter().collect();
-    glyphs.sort_by(|a, b| a.x.total_cmp(&b.x));
-    for glyph in glyphs {
-        if glyph.font != font {
-            font = glyph.font;
-            let name = font_name(font);
-            content.set_font(Name(name.as_bytes()), size);
+    // One TJ run covers a font and baseline; the adjustment undoes the font
+    // width so the next glyph lands on its shaped x.
+    let mut glyphs: Vec<_> = paint.shaped.glyphs.iter().collect();
+    glyphs.sort_by(|a, b| a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y)));
+    let mut index = 0;
+    while index < glyphs.len() {
+        let font = glyphs[index].font;
+        let y = glyphs[index].y;
+        let name = font_name(font);
+        content.set_font(Name(name.as_bytes()), paint.size);
+        content.set_text_matrix([
+            1.,
+            0.,
+            0.,
+            1.,
+            paint.position[0] + glyphs[index].x,
+            paint.position[1] + y,
+        ]);
+        let start = index;
+        let mut pen = glyphs[index].x;
+        let mut positioned = content.show_positioned();
+        let mut items = positioned.items();
+        while index < glyphs.len()
+            && glyphs[index].font == font
+            && (glyphs[index].y - y).abs() < 0.01
+        {
+            let glyph = glyphs[index];
+            if index > start {
+                let delta = glyph.x - pen;
+                if delta.abs() > 0.01 {
+                    items.adjust(-delta * 1000. / paint.size);
+                }
+            }
+            let cid = cff_cids
+                .get(&(glyph.font, glyph.cid))
+                .copied()
+                .unwrap_or(glyph.cid);
+            let encoded = cid.to_be_bytes();
+            items.show(Str(&encoded));
+            pen = glyph.x + advances.advance(fonts, glyph, paint.size);
+            index += 1;
         }
-        content.set_text_matrix([1., 0., 0., 1., position[0] + glyph.x, position[1] + glyph.y]);
-        let cid = cff_cids
-            .get(&(glyph.font, glyph.cid))
-            .copied()
-            .unwrap_or(glyph.cid);
-        content.show(Str(&cid.to_be_bytes()));
-        let _ = glyph.advance;
     }
     content.end_text();
+}
+
+struct AdvanceCache {
+    faces: Vec<Option<(f32, BTreeMap<u16, i32>)>>,
+}
+
+impl AdvanceCache {
+    fn advance(
+        &mut self,
+        fonts: &crate::fonts::Fonts,
+        glyph: &crate::fonts::Glyph,
+        size: f32,
+    ) -> f32 {
+        if self.faces.len() <= glyph.font {
+            self.faces.resize_with(glyph.font + 1, || None);
+        }
+        if self.faces[glyph.font].is_none() {
+            let font = &fonts.fonts[glyph.font];
+            let face = ttf_parser::Face::parse(&font.bytes, font.index).expect("parsed face");
+            let mut widths = BTreeMap::new();
+            for (unit, cid) in &font.glyphs {
+                let units = if unit.components.len() == 1
+                    && unit.components[0].1 == 0
+                    && unit.components[0].2 == 0
+                {
+                    i32::from(
+                        face.glyph_hor_advance(ttf_parser::GlyphId(unit.components[0].0))
+                            .unwrap_or(0),
+                    )
+                } else {
+                    unit.advance
+                };
+                widths.insert(*cid, units);
+            }
+            self.faces[glyph.font] = Some((face.units_per_em() as f32, widths));
+        }
+        let (upem, widths) = self.faces[glyph.font].as_ref().unwrap();
+        let units = widths
+            .get(&glyph.cid)
+            .copied()
+            .expect("shaped glyph has a mapping");
+        units as f32 * size / upem
+    }
 }
 
 fn structure_role(role: &str, ua1: bool) -> &str {
@@ -396,6 +473,7 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
     let mut rank = 0usize;
     let mut ranks = vec![usize::MAX; layout.tags.len()];
     let mut links: Vec<(Ref, Ref, usize)> = vec![];
+    let mut advances = AdvanceCache { faces: Vec::new() };
     for (page_index, page) in layout.pages.iter().enumerate() {
         let mut content = Content::new();
         let content_id = ids.next();
@@ -428,10 +506,14 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
                 } => {
                     text(
                         &mut content,
-                        shaped,
-                        *size,
-                        [draw.x, draw.y],
-                        [0.; 3],
+                        &layout.fonts,
+                        &mut advances,
+                        &TextPaint {
+                            shaped,
+                            size: *size,
+                            position: [draw.x, draw.y],
+                            color: [0.; 3],
+                        },
                         &cff_cids,
                     );
                     if link.is_some() || target.is_some() {
@@ -548,10 +630,14 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
                     for run in &b.runs {
                         text(
                             &mut content,
-                            &run.shaped,
-                            run.size,
-                            [draw.x + run.x, draw.y + run.y],
-                            run.color,
+                            &layout.fonts,
+                            &mut advances,
+                            &TextPaint {
+                                shaped: &run.shaped,
+                                size: run.size,
+                                position: [draw.x + run.x, draw.y + run.y],
+                                color: run.color,
+                            },
                             &cff_cids,
                         );
                     }
@@ -858,7 +944,11 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
             }
         }
     }
-    let bytes = pdf.finish();
+    // Measured before TJ runs, object streams, and the xref stream
+    // (article template, DejaVu Serif, 2026-11-03): a 9-page plain document
+    // was 430377 bytes and a one-page sample with a heading, inline math, and
+    // one display equation was 27526 bytes.
+    let bytes = pack_objects(&pdf.finish())?;
     if bytes.len() > 16 * 1024 * 1024 {
         return Err(Diagnostic::new(
             "pdf-limit",
@@ -866,4 +956,402 @@ pub fn write(layout: &Layout, standard: Option<&str>) -> Result<Vec<u8>> {
         ));
     }
     Ok(bytes)
+}
+
+fn pdf_err(message: impl Into<String>) -> Diagnostic {
+    Diagnostic::new("pdf-write", message)
+}
+
+/// Pack every non-stream object, including the catalog and structure tree,
+/// into one compressed object stream and replace the classic xref with a
+/// compressed xref stream. Stream objects stay as ordinary objects.
+fn pack_objects(pdf: &[u8]) -> Result<Vec<u8>> {
+    let xref_at = pdf
+        .windows(6)
+        .rposition(|window| window == b"\nxref\n")
+        .ok_or_else(|| pdf_err("missing xref"))?
+        + 1;
+    let xref_text =
+        std::str::from_utf8(&pdf[xref_at..]).map_err(|error| pdf_err(error.to_string()))?;
+    let mut lines = xref_text.lines();
+    if lines.next() != Some("xref") {
+        return Err(pdf_err("xref header"));
+    }
+    let mut offsets: Vec<Option<usize>> = Vec::new();
+    loop {
+        let Some(line) = lines.next() else {
+            break;
+        };
+        if line.starts_with("trailer") {
+            break;
+        }
+        let mut parts = line.split_whitespace();
+        let start: usize = parts
+            .next()
+            .ok_or_else(|| pdf_err("xref subsection"))?
+            .parse()
+            .map_err(|error: std::num::ParseIntError| pdf_err(error.to_string()))?;
+        let count: usize = parts
+            .next()
+            .ok_or_else(|| pdf_err("xref subsection"))?
+            .parse()
+            .map_err(|error: std::num::ParseIntError| pdf_err(error.to_string()))?;
+        if offsets.len() < start + count {
+            offsets.resize(start + count, None);
+        }
+        for index in 0..count {
+            let entry = lines.next().ok_or_else(|| pdf_err("truncated xref"))?;
+            let mut fields = entry.split_whitespace();
+            let offset: u64 = fields
+                .next()
+                .ok_or_else(|| pdf_err("xref entry"))?
+                .parse()
+                .map_err(|error: std::num::ParseIntError| pdf_err(error.to_string()))?;
+            let _generation = fields.next().ok_or_else(|| pdf_err("xref entry"))?;
+            let flag = fields.next().ok_or_else(|| pdf_err("xref entry"))?;
+            if flag == "n" {
+                offsets[start + index] =
+                    Some(usize::try_from(offset).map_err(|error| pdf_err(error.to_string()))?);
+            }
+        }
+    }
+    let trailer_at = pdf[xref_at..]
+        .windows(7)
+        .position(|window| window == b"trailer")
+        .ok_or_else(|| pdf_err("missing trailer"))?
+        + xref_at;
+    let dict_at = pdf[trailer_at..]
+        .windows(2)
+        .position(|window| window == b"<<")
+        .ok_or_else(|| pdf_err("trailer dictionary"))?
+        + trailer_at;
+    let trailer_end = scan_dict(pdf, dict_at)?;
+    let trailer = &pdf[dict_at..trailer_end];
+    let root = trailer_reference(trailer, b"/Root")?;
+    let info = trailer_reference(trailer, b"/Info").ok();
+
+    let header_end = offsets.iter().flatten().copied().min().unwrap_or(pdf.len());
+    let mut out = pdf[..header_end].to_vec();
+    if !out.ends_with(b"\n") {
+        out.push(b'\n');
+    }
+
+    let objstm_id = offsets.len();
+    let xref_id = offsets.len() + 1;
+    let new_size = offsets.len() + 2;
+    #[derive(Clone, Copy)]
+    enum XRef {
+        Free,
+        InUse(usize),
+        Compressed(usize),
+    }
+    let mut xref = vec![XRef::Free; new_size];
+    let mut packed: Vec<(usize, Vec<u8>)> = Vec::new();
+    for (id, offset) in offsets.iter().enumerate() {
+        let Some(offset) = offset else {
+            continue;
+        };
+        let (bytes, stream) = slice_object(pdf, *offset)?;
+        if stream {
+            xref[id] = XRef::InUse(out.len());
+            out.extend_from_slice(&bytes);
+            if !out.ends_with(b"\n") {
+                out.push(b'\n');
+            }
+        } else {
+            packed.push((id, object_value(&bytes)?));
+        }
+    }
+
+    let mut index = String::new();
+    let mut body = Vec::new();
+    for (position, (id, value)) in packed.iter().enumerate() {
+        if position > 0 {
+            index.push(' ');
+        }
+        index.push_str(&format!("{id} {}", body.len()));
+        body.extend_from_slice(value);
+        body.push(b'\n');
+        xref[*id] = XRef::Compressed(position);
+    }
+    index.push('\n');
+    let first = index.len();
+    let mut raw = index.into_bytes();
+    raw.extend_from_slice(&body);
+    let compressed_objects = compressed(&raw)?;
+    let objstm_at = out.len();
+    let objstm_header = format!(
+        "{objstm_id} 0 obj\n<<\n  /Type /ObjStm\n  /N {}\n  /First {first}\n  /Filter /FlateDecode\n  /Length {}\n>>\nstream\n",
+        packed.len(),
+        compressed_objects.len()
+    );
+    out.extend_from_slice(objstm_header.as_bytes());
+    out.extend_from_slice(&compressed_objects);
+    out.extend_from_slice(b"\nendstream\nendobj\n");
+    xref[objstm_id] = XRef::InUse(objstm_at);
+
+    let xref_at = out.len();
+    if xref_at > u32::MAX as usize {
+        return Err(pdf_err("xref offset exceeds 32 bits"));
+    }
+    xref[xref_id] = XRef::InUse(xref_at);
+    let mut xref_data = Vec::with_capacity(new_size * 7);
+    for entry in &xref {
+        match entry {
+            XRef::Free => {
+                xref_data.push(0);
+                xref_data.extend_from_slice(&0u32.to_be_bytes());
+                xref_data.extend_from_slice(&65535u16.to_be_bytes());
+            }
+            XRef::InUse(offset) => {
+                xref_data.push(1);
+                xref_data.extend_from_slice(&(*offset as u32).to_be_bytes());
+                xref_data.extend_from_slice(&0u16.to_be_bytes());
+            }
+            XRef::Compressed(index) => {
+                xref_data.push(2);
+                xref_data.extend_from_slice(&(objstm_id as u32).to_be_bytes());
+                xref_data.extend_from_slice(&(*index as u16).to_be_bytes());
+            }
+        }
+    }
+    let compressed_xref = compressed(&xref_data)?;
+    let mut info_line = String::new();
+    if let Some(info) = info {
+        info_line = format!("  /Info {info}\n");
+    }
+    let xref_header = format!(
+        "{xref_id} 0 obj\n<<\n  /Type /XRef\n  /Size {new_size}\n  /W [1 4 2]\n  /Index [0 {new_size}]\n  /Root {root}\n{info_line}  /Filter /FlateDecode\n  /Length {}\n>>\nstream\n",
+        compressed_xref.len()
+    );
+    out.extend_from_slice(xref_header.as_bytes());
+    out.extend_from_slice(&compressed_xref);
+    out.extend_from_slice(b"\nendstream\nendobj\nstartxref\n");
+    out.extend_from_slice(xref_at.to_string().as_bytes());
+    out.extend_from_slice(b"\n%%EOF\n");
+    Ok(out)
+}
+
+fn slice_object(pdf: &[u8], start: usize) -> Result<(Vec<u8>, bool)> {
+    let obj_at = pdf[start..]
+        .windows(3)
+        .position(|window| window == b"obj")
+        .ok_or_else(|| pdf_err("object header"))?
+        + start;
+    let mut body_at = obj_at + 3;
+    while pdf.get(body_at).is_some_and(u8::is_ascii_whitespace) {
+        body_at += 1;
+    }
+    if !pdf[body_at..].starts_with(b"<<") {
+        return Err(pdf_err("expected a dictionary object"));
+    }
+    let dict_end = scan_dict(pdf, body_at)?;
+    if let Some(data_at) = stream_data_at(pdf, dict_end) {
+        let length = direct_length(&pdf[body_at..dict_end])?;
+        let mut end = data_at + length;
+        if pdf.get(end) == Some(&b'\r') {
+            end += 1;
+        }
+        if pdf.get(end) == Some(&b'\n') {
+            end += 1;
+        }
+        if !pdf[end..].starts_with(b"endstream") {
+            return Err(pdf_err("stream Length does not reach endstream"));
+        }
+        end += b"endstream".len();
+        while pdf.get(end).is_some_and(u8::is_ascii_whitespace) {
+            end += 1;
+        }
+        if !pdf[end..].starts_with(b"endobj") {
+            return Err(pdf_err("stream is missing endobj"));
+        }
+        end += b"endobj".len();
+        if pdf.get(end) == Some(&b'\n') {
+            end += 1;
+        }
+        return Ok((pdf[start..end].to_vec(), true));
+    }
+    let endobj = pdf[dict_end..]
+        .windows(6)
+        .position(|window| window == b"endobj")
+        .ok_or_else(|| pdf_err("missing endobj"))?
+        + dict_end;
+    let mut end = endobj + b"endobj".len();
+    if pdf.get(end) == Some(&b'\n') {
+        end += 1;
+    }
+    Ok((pdf[start..end].to_vec(), false))
+}
+
+fn object_value(object: &[u8]) -> Result<Vec<u8>> {
+    let obj_at = object
+        .windows(3)
+        .position(|window| window == b"obj")
+        .ok_or_else(|| pdf_err("object header"))?;
+    let mut start = obj_at + 3;
+    while object.get(start).is_some_and(u8::is_ascii_whitespace) {
+        start += 1;
+    }
+    let end = object
+        .windows(6)
+        .rposition(|window| window == b"endobj")
+        .ok_or_else(|| pdf_err("missing endobj"))?;
+    let mut body = object[start..end].to_vec();
+    while body.last().is_some_and(u8::is_ascii_whitespace) {
+        body.pop();
+    }
+    if !body.starts_with(b"<<") {
+        return Err(pdf_err("object stream values must be dictionaries"));
+    }
+    Ok(body)
+}
+
+fn direct_length(dict: &[u8]) -> Result<usize> {
+    let mut index = 0;
+    while index + b"/Length".len() < dict.len() {
+        if dict[index..].starts_with(b"/Length") {
+            let next = dict[index + b"/Length".len()];
+            if next.is_ascii_alphanumeric() {
+                index += 1;
+                continue;
+            }
+            let mut cursor = index + b"/Length".len();
+            while dict.get(cursor).is_some_and(u8::is_ascii_whitespace) {
+                cursor += 1;
+            }
+            let digits = cursor;
+            while dict.get(cursor).is_some_and(u8::is_ascii_digit) {
+                cursor += 1;
+            }
+            if cursor == digits {
+                return Err(pdf_err("Length is not a direct integer"));
+            }
+            let text = std::str::from_utf8(&dict[digits..cursor])
+                .map_err(|error| pdf_err(error.to_string()))?;
+            return text
+                .parse()
+                .map_err(|error: std::num::ParseIntError| pdf_err(error.to_string()));
+        }
+        index += 1;
+    }
+    Err(pdf_err("stream is missing Length"))
+}
+
+fn stream_data_at(data: &[u8], dict_end: usize) -> Option<usize> {
+    let mut index = dict_end;
+    while matches!(data.get(index), Some(b' ' | b'\t')) {
+        index += 1;
+    }
+    if data[index..].starts_with(b"\r\n") {
+        index += 2;
+    } else if data.get(index) == Some(&b'\n') {
+        index += 1;
+    }
+    if !data[index..].starts_with(b"stream") {
+        return None;
+    }
+    index += b"stream".len();
+    if data[index..].starts_with(b"\r\n") {
+        index += 2;
+    } else if data.get(index) == Some(&b'\n') {
+        index += 1;
+    } else {
+        return None;
+    }
+    Some(index)
+}
+
+fn trailer_reference(trailer: &[u8], key: &[u8]) -> Result<String> {
+    let position = trailer
+        .windows(key.len())
+        .position(|window| window == key)
+        .ok_or_else(|| pdf_err(format!("trailer missing {}", String::from_utf8_lossy(key))))?;
+    let mut index = position + key.len();
+    while trailer.get(index).is_some_and(u8::is_ascii_whitespace) {
+        index += 1;
+    }
+    let start = index;
+    while trailer.get(index).is_some_and(|byte| *byte != b'R') {
+        index += 1;
+    }
+    if trailer.get(index) != Some(&b'R') {
+        return Err(pdf_err("trailer reference"));
+    }
+    let text =
+        std::str::from_utf8(&trailer[start..=index]).map_err(|error| pdf_err(error.to_string()))?;
+    Ok(text.split_whitespace().collect::<Vec<_>>().join(" "))
+}
+
+fn scan_dict(data: &[u8], start: usize) -> Result<usize> {
+    if !data[start..].starts_with(b"<<") {
+        return Err(pdf_err("expected a dictionary"));
+    }
+    let mut index = start + 2;
+    let mut depth = 1;
+    while index < data.len() && depth > 0 {
+        if data[index] == b'(' {
+            index = skip_literal(data, index)?;
+        } else if data[index] == b'<' && data.get(index + 1) == Some(&b'<') {
+            depth += 1;
+            index += 2;
+        } else if data[index] == b'>' && data.get(index + 1) == Some(&b'>') {
+            depth -= 1;
+            index += 2;
+        } else if data[index] == b'<' {
+            index = skip_hex(data, index)?;
+        } else if data[index] == b'[' {
+            index = skip_array(data, index)?;
+        } else {
+            index += 1;
+        }
+    }
+    if depth != 0 {
+        return Err(pdf_err("unclosed dictionary"));
+    }
+    Ok(index)
+}
+
+fn skip_array(data: &[u8], start: usize) -> Result<usize> {
+    let mut index = start + 1;
+    let mut depth = 1;
+    while index < data.len() && depth > 0 {
+        match data[index] {
+            b'(' => index = skip_literal(data, index)?,
+            b'[' => {
+                depth += 1;
+                index += 1;
+            }
+            b']' => {
+                depth -= 1;
+                index += 1;
+            }
+            b'<' if data.get(index + 1) == Some(&b'<') => index = scan_dict(data, index)?,
+            b'<' => index = skip_hex(data, index)?,
+            _ => index += 1,
+        }
+    }
+    if depth != 0 {
+        return Err(pdf_err("unclosed array"));
+    }
+    Ok(index)
+}
+
+fn skip_literal(data: &[u8], start: usize) -> Result<usize> {
+    let mut index = start + 1;
+    while index < data.len() {
+        match data[index] {
+            b'\\' => index += 2,
+            b')' => return Ok(index + 1),
+            _ => index += 1,
+        }
+    }
+    Err(pdf_err("unclosed literal string"))
+}
+
+fn skip_hex(data: &[u8], start: usize) -> Result<usize> {
+    let end = data[start + 1..]
+        .iter()
+        .position(|byte| *byte == b'>')
+        .ok_or_else(|| pdf_err("unclosed hex string"))?;
+    Ok(start + 1 + end + 1)
 }

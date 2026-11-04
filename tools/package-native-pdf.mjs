@@ -73,7 +73,13 @@ for (const font of fonts) {
 }
 await writeFile(join(directory, "fonts.json"), JSON.stringify(fonts, null, 2));
 await record("fonts.json");
-for (const name of ["noto-core.txt", "noto-cjk.txt", "dejavu.txt"]) {
+for (const name of [
+  "noto-core.txt",
+  "noto-cjk.txt",
+  "dejavu.txt",
+  "noto-emoji.txt",
+  "noto-sans-math.txt",
+]) {
   await copyFile(
     join(licensesDirectory, name),
     join(directory, "licenses", name),

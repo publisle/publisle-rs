@@ -6,6 +6,7 @@ The native PDF engine and bounded math parser for [Publisle](https://github.com/
 - `crates/publisle-cli`: `publisle-rs` command line tools; this name coexists with the npm `publisle` executable.
 - `crates/publisle-pdf`: article layout, font shaping, vector graphics and tagged PDFs.
 - `crates/publisle-math`: bounded TeX math syntax and MathML, with no PDF or font dependencies.
+- `publisle-research` is a reserved crates.io name and there is no crate for it in this workspace.
 - `npm/`: manifests for five binary-and-font packages; package versions derive from the PDF crate at build time.
 - `conformance/`: immutable upstream JSON Schemas, fixtures, figure regressions and the engine gap report.
 
