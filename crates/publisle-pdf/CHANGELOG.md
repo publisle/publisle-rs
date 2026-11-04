@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.6.4...publisle-pdf-v0.6.5) - 2026-11-04
+
+### Fixed
+
+- keep non-dictionary PDF objects out of the object stream
+
 ## [0.6.4](https://github.com/publisle/publisle-rs/compare/publisle-pdf-v0.6.3...publisle-pdf-v0.6.4) - 2026-11-04
 
 ### Fixed
