@@ -1,6 +1,6 @@
 [package]
 name = "publisle-pdf"
-version = "0.6.5"
+version = "0.6.6"
 edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -33,7 +33,7 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [dependencies]
-publisle-math = { path = "../publisle-math", version = "0.2.1" }
+publisle-math = { path = "../publisle-math", version = "0.2.2" }
 flate2 = "1.1"
 pdf-writer = "0.15"
 rustybuzz = "0.20"

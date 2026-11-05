@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9](https://github.com/publisle/publisle-rs/compare/publisle-v0.1.8...publisle-v0.1.9) - 2026-11-05
+
+### Other
+
+- deny missing rustdoc and publish the API intros
+
 ## [0.1.8](https://github.com/publisle/publisle-rs/compare/publisle-v0.1.7...publisle-v0.1.8) - 2026-11-04
 
 ### Other
