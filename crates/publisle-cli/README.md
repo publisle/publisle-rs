@@ -1,7 +1,8 @@
 # publisle-cli
 
-Install with `cargo install publisle-cli`. The executable is **publisle-rs** so
-it can coexist with the npm `publisle` Markdown CLI.
+`publisle-cli` is the command-line wrapper around `publisle-pdf` and
+`publisle-math`. Install with `cargo install publisle-cli`. The executable is
+**publisle-rs** so it can coexist with the npm `publisle` Markdown CLI.
 
 ```sh
 publisle-rs pdf input.json paper.pdf --fonts /absolute/path/fonts.json

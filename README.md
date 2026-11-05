@@ -1,60 +1,34 @@
-# Publisle Rust engines
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/publisle/publisle/main/docs/assets/brand/lockup-dark.svg" />
+    <img src="https://raw.githubusercontent.com/publisle/publisle/main/docs/assets/brand/lockup-light.svg" alt="Publisle" width="420" />
+  </picture>
+  <p><strong>The native PDF and math engines behind Publisle.</strong></p>
+  <p>
+    <a href="https://github.com/publisle/publisle-rs/actions/workflows/ci.yml"><img src="https://github.com/publisle/publisle-rs/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
+    <img src="https://img.shields.io/badge/status-experimental-9B3214" alt="experimental" />
+    <a href="https://crates.io/crates/publisle-pdf"><img src="https://img.shields.io/crates/v/publisle-pdf" alt="publisle-pdf on crates.io" /></a>
+    <a href="https://docs.rs/publisle-pdf"><img src="https://img.shields.io/docsrs/publisle-pdf" alt="publisle-pdf docs" /></a>
+  </p>
+</div>
 
-The native PDF engine and bounded math parser for [Publisle](https://github.com/publisle/publisle). The engine was extracted from the TypeScript repository with all 13 native commits preserved. `git log -- crates/publisle-pdf` shows the original engine history; `.git/filter-repo/commit-map` records rewritten commits locally.
+Publisle Rust compiles a resolved article into tagged PDF and parses a bounded
+TeX math fragment into MathML. It does not fetch the network and it does not
+run TeX. Markdown conversion stays in the npm [`@publisle/cli`](https://github.com/publisle/publisle).
 
-- `crates/publisle`: optional PDF and math facade for library users.
-- `crates/publisle-cli`: `publisle-rs` command line tools; this name coexists with the npm `publisle` executable.
-- `crates/publisle-pdf`: article layout, font shaping, vector graphics and tagged PDFs.
+## What's inside
+
+- `crates/publisle-pdf`: article layout, font shaping, vector graphics, and tagged PDF.
 - `crates/publisle-math`: bounded TeX math syntax and MathML, with no PDF or font dependencies.
-- `publisle-research` is a reserved crates.io name and there is no crate for it in this workspace.
-- `npm/`: manifests for five binary-and-font packages; package versions derive from the PDF crate at build time.
-- `conformance/`: immutable upstream JSON Schemas, fixtures, figure regressions and the engine gap report.
+- `crates/publisle`: a small facade over the PDF compiler and the math parser.
+- `crates/publisle-cli`: the `publisle-rs` command. The name sits beside the npm `publisle` executable.
+- `npm/`: five platform packages that ship the compiler binary and the pinned fonts.
+- `conformance/`: schemas, fixtures, and the measured gap report.
 
-## Development
+## Quickstart
 
-Rust 1.90.0 is pinned in `rust-toolchain.toml`; Node 24 is required for packaging and conformance checks.
-
-```sh
-npm ci --ignore-scripts
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --locked -- -D warnings
-PUBLISLE_TEST_FONT_DIR=/usr/share/fonts/truetype/dejavu cargo test --workspace --locked
-node tools/check-conformance.mjs
-node --test tools/tests/*.test.mjs
-cargo build --release --locked -p publisle-pdf
-```
-
-Install `fonts-dejavu-core` and `fonts-dejavu-extra` for the font regression tests. The five-platform CI builds against Debian bookworm glibc on Linux and the pinned Rust toolchain on macOS and Windows. Each package is smoke-tested with an empty PATH before its exact tarball is uploaded. Fonts and their licenses use the same reviewed Docker font stage as the hosted worker.
-
-## Releases
-
-`release.yml` runs full CI, uses release-plz to prepare crate version PRs and publish crates through crates.io OIDC, then publishes the five validated npm tarballs through npm OIDC. The default GitHub token needs permission to create release PRs. A release PR made with that token needs a human close/reopen or an explicit workflow dispatch before merging, because GitHub suppresses downstream workflow events created by that token.
-
-Crates.io trusted publishers for `publisle`, `publisle-cli`, `publisle-pdf`, `publisle-math`, and the reserved `publisle-research` name must point to `publisle/publisle-rs`, workflow `release.yml`, with no environment. All five names are already bootstrapped; configure their publishers before merging a release PR. `publisle-research` remains a reservation and is not part of this workspace. Release PR analysis uses Rust 1.93.0 for the pinned cargo-semver-checks tool; engine builds, tests, and crate publication remain on Rust 1.90.0. No long-lived crates.io token is stored here. Native npm packages must trust the same repository and workflow, with no environment restriction:
-
-```sh
-node tools/npm-trusted-publishers.mjs
-node tools/npm-trusted-publishers.mjs --apply
-node tools/npm-trusted-publishers.mjs --audit
-```
-
-Use npm >=12.2 and a browser-authenticated account with package administration rights. `NPM_CLI_PATH` and `NPM_CONFIG_USERCONFIG` can select a separate CLI and login.
-
-The npm publisher waits for the `publisle-pdf-vVERSION` crate release tag at the exact source commit and the corresponding crates.io version. It preflights all five immutable versions before uploading anything; recovery accepts an existing version only when its tarball SHA-512 matches. Use **Re-run failed jobs** on the original run to finish a partial release from its retained tarballs and upload record. Never rerun validation or rebuild after an upload has been accepted. The crate release retains the tarballs and `native-release.json` as evidence. Never bump versions to hide a partial publication.
-
-## Migration boundary
-
-Deployment, service integration and VPS secrets stay in `publisle/publisle`.
-Research and the VPS worker pin the five external native packages to the same
-PDF crate version. When a native release ships, update Research optional
-dependencies, the workspace release-age exclusions, the VPS runtime manifest
-and lockfile, and the root pnpm lock. Verify Linux, macOS and Windows consumer
-installs before releasing the Research patch. Dependabot groups native updates.
-
-## Native CLI and library APIs
-
-`cargo install publisle-cli` installs `publisle-rs`. It consumes resolved input
-JSON, not Markdown; use npm `@publisle/cli` for Markdown conversion.
+Requires Rust 1.90.0. `cargo install publisle-cli` installs `publisle-rs`. The
+commands take resolved JSON or a math fragment, not Markdown.
 
 ```sh
 publisle-rs pdf INPUT.json NEW-OUTPUT.pdf --fonts /absolute/path/fonts.json
@@ -62,11 +36,29 @@ publisle-rs math '\hat{x}+\binom{n}{k}' --mathml
 publisle-rs fonts check --fonts /absolute/path/fonts.json
 ```
 
-`PUBLISLE_NATIVE_FONTS` can replace `--fonts`. See the [CLI manifest format](crates/publisle-cli/README.md)
-and the matching npm native package's `fonts/` directory. Font files are not
-bundled into crates.io packages. The facade defaults to the `pdf` feature;
-`default-features = false, features = ["math"]` selects the font-independent parser.
-Unsupported math commands stay visible in red with structured warnings. Syntax
-limits, malformed input and TeX execution attempts still fail with diagnostics.
+`PUBLISLE_NATIVE_FONTS` can replace `--fonts`. Font files are not part of the
+crates.io packages; start from the matching `@publisle/pdf-native-*` package.
+The facade defaults to the `pdf` feature. `default-features = false, features = ["math"]`
+selects the font-independent parser. Unsupported math commands stay visible in
+red, with structured warnings.
 
-The engine remains experimental. Extraction does not resolve every gap in [the measured gap report](conformance/rust-engine-gaps.md) or change the existing readiness gates.
+Library and manifest details live in the
+[CLI README](crates/publisle-cli/README.md) and on
+[docs.rs](https://docs.rs/publisle-pdf).
+
+## Status
+
+The engine remains experimental. Shipping a release does not close every gap in
+[the measured gap report](conformance/rust-engine-gaps.md). PDF/UA metadata
+records the requested standard. Compliance still needs independent validation.
+
+Production Publisle pins `publisle-pdf` 0.6.5.
+
+## Contributing
+
+See [Contributing](CONTRIBUTING.md) for local checks, releases, and how a native
+version is pinned in Publisle.
+
+## License
+
+[MIT](LICENSE) — Copyright (c) 2026 Publisle.
