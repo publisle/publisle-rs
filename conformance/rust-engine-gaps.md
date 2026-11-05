@@ -1,5 +1,7 @@
 # Rust (native) PDF engine vs LuaLaTeX: gap report
 
+Superseded in part by the 0.6.x releases. The measurements below are unchanged and were taken against `publisle-pdf` 0.3.0.
+
 This was tested on Fri 23 Oct 2026 between 20:41 and 21:30 UTC+3.
 - **Live PDF service:** api.publisle.xyz, PDF service deployed at 12:38 today, native compiler `publisle-pdf 0.3.0`.
 - **Repo:** main at cc5f666.
