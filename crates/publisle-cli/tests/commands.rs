@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use assert_cmd::Command;
 #[test]
 fn math_is_network_and_font_independent() {
