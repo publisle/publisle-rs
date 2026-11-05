@@ -19,7 +19,8 @@ missing_docs = "deny"
 broken_intra_doc_links = "deny"
 
 [profile.release]
-lto = "thin"
+opt-level = 3
+lto = "fat"
 codegen-units = 1
-strip = true
+strip = "symbols"
 panic = "abort"
