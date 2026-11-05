@@ -52,3 +52,6 @@ hyphenation = { version = "0.8", default-features = false, features = ["embed_en
 
 [package.metadata.docs.rs]
 all-features = true
+
+[lints]
+workspace = true

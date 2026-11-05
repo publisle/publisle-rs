@@ -1,5 +1,4 @@
 #![doc = include_str!("../README.md")]
-#![warn(missing_docs)]
 use clap::{Args, Parser, Subcommand};
 use publisle_pdf::model::{FontSpec, Input};
 use std::{

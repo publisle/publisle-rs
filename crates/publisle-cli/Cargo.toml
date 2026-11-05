@@ -9,7 +9,7 @@ homepage.workspace = true
 authors.workspace = true
 readme = "README.md"
 description = "Publisle native PDF and math command line tools"
-documentation = "https://github.com/publisle/publisle-rs/blob/main/crates/publisle-cli/README.md"
+documentation = "https://docs.rs/publisle-cli"
 keywords = ["pdf", "typesetting", "math", "cli"]
 categories = ["command-line-utilities"]
 
@@ -28,3 +28,6 @@ assert_cmd = "2"
 
 [package.metadata.docs.rs]
 all-features = true
+
+[lints]
+workspace = true

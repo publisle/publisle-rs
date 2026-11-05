@@ -24,3 +24,6 @@ publisle-math = { path = "../publisle-math", version = "0.2.1", optional = true 
 
 [package.metadata.docs.rs]
 all-features = true
+
+[lints]
+workspace = true

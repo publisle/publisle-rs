@@ -1,5 +1,4 @@
 #![doc = include_str!("../README.md")]
-#![warn(missing_docs)]
 //! A bounded, non-executing parser for Publisle's TeX math contract.
 /// A bounded math parsing failure. Arbitrary TeX execution is never supported.
 #[derive(Clone, Debug, PartialEq, Eq)]

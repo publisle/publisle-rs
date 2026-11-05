@@ -12,6 +12,12 @@ homepage = "https://publisle.xyz"
 authors = ["Publisle contributors"]
 readme = "README.md"
 
+[workspace.lints.rust]
+missing_docs = "deny"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

@@ -1,26 +1,17 @@
 # Native PDF compiler (experimental)
 
-`publisle-pdf` is a bounded, network-free Rust compiler for Publisle's resolved
-article model. It embeds subset fonts, shapes text with Rustybuzz, lays out
-Unicode text and vectors, and writes tagged PDF 2.0 with MathML associations.
-No TeX installation is needed at runtime. LaTeX source/submission export keeps
-using the existing research source generators.
+`publisle-pdf` compiles Publisle's resolved article model into tagged PDF 2.0.
+It embeds subset fonts, shapes text with Rustybuzz, lays out Unicode text and
+vectors, and associates MathML with equations. It does not fetch the network
+and it does not need a TeX installation. LaTeX source export stays in
+`@publisle/research`.
 
-```sh
-cargo build --release --locked --manifest-path crates/publisle-pdf/Cargo.toml
-PUBLISLE_TEST_FONT_DIR=/usr/share/fonts/truetype/dejavu cargo test --locked --manifest-path crates/publisle-pdf/Cargo.toml
-cargo clippy --locked --manifest-path crates/publisle-pdf/Cargo.toml --all-targets -- -D warnings
-target/release/publisle-pdf INPUT.json NEW-OUTPUT.pdf
-```
-
-The versioned input is defined in `src/model.rs` and lowered by
-`createNativePdfPackage` in `@publisle/research`. The CLI writes one bounded JSON
-report to stdout, creates output exclusively, and returns nonzero on failure.
-Input files, fonts and local figure paths must be supplied by the trusted host.
-The hosted runtime has no network, writable root, or TeX execution support.
-
-For the Research CLI, explicitly configure `PUBLISLE_NATIVE_COMPILER` with the
-absolute binary path and `PUBLISLE_NATIVE_FONTS` with a JSON font manifest:
+The public API is `compile` plus the `model` module (`Input`, `Report`, and
+`Diagnostic`). Everything else in this crate is private. The versioned input
+is the JSON a trusted host produces from a Publisle document. The compiler
+writes one JSON report, creates the output file exclusively, and returns an
+error on failure. Font files and local figures are supplied by that host.
+They are not downloaded and they are not bundled in the crate.
 
 ```json
 [
@@ -28,36 +19,21 @@ absolute binary path and `PUBLISLE_NATIVE_FONTS` with a JSON font manifest:
   { "path": "/absolute/path/NotoSerif-Bold.ttf", "role": "bold" },
   { "path": "/absolute/path/NotoSerif-Italic.ttf", "role": "italic" },
   { "path": "/absolute/path/DejaVuSansMono.ttf", "role": "mono" },
-  { "path": "/absolute/path/NotoNaskhArabic-Regular.ttf", "role": "fallback" }
+  { "path": "/absolute/path/NotoNaskhArabic-Regular.ttf", "role": "fallback" },
+  { "path": "/absolute/path/NotoSansMath-Regular.ttf", "role": "math" }
 ]
 ```
 
-Then use `publisle export manuscript.md --to pdf --engine rust --output paper.pdf`.
-The Node API also exposes `compileNativePdf(document, options)` and the
-`exportPdf(document, {engine: "rust", sourceDirectory, ...options})` overload.
-Local figures must remain inside `sourceDirectory`; HTTP sources are rejected
-by this API. Hosted images are fetched and validated separately by the service.
+The command-line wrapper is `publisle-rs` from `publisle-cli`. Markdown
+conversion stays in npm `@publisle/cli`.
 
-Seven profiles have publisher-class measurements for page geometry, margins,
-font sizes and column counts. Release checks require standards compliance,
-complete feature support and readable output without clipping, overlap or lost
-content. Exact legacy fonts, line breaks, pagination and raster similarity are
-not required. Measurements alone do not establish publisher approval.
-Native CLI use is explicit. Hosted profiles are advertised only after immutable
-image, resource-budget, content, rendering quality, PDF/UA and speed verification.
+Math is the bounded Publisle contract, not a TeX interpreter. Unknown commands,
+malformed groups, oversized expressions, and unsupported glyphs return
+diagnostics. Indexed roots are supported. Arbitrary macros and packages are not.
+TrueType clusters keep a Unicode mapping when one character needs several
+glyphs. The Arabic article profile is compiled here. Complex CFF1 clusters that
+cannot preserve that mapping fail with a font diagnostic; use a TrueType font
+for those scripts.
 
-Math is a bounded parser for the supported Publisle math contract, not a TeX
-interpreter. Unknown commands, malformed groups, oversized expressions and
-unsupported glyphs return diagnostics rather than silently losing content.
-Indexed roots are supported. Arbitrary macros/packages remain unsupported.
-TrueType clusters preserve Unicode text even when one character needs several
-shaped glyphs. Arabic ligatures and diacritics have individual Unicode positions;
-Poppler and PDF.js extraction are independently checked in the hosted tests.
-Arabic remains on the legacy hosted engine pending complete layout and interactive
-reader verification. Complex CFF1 clusters that cannot preserve this mapping fail with
-an actionable font diagnostic; use a TrueType font for those scripts.
-
-PDF/UA metadata records the requested standard. Compliance requires independent
-validation and review of authored alt text, reading order and equations. Run the
-native service integration test with `PDF_TEST_NATIVE_WORKER_IMAGE` and
-`PDF_TEST_VERAPDF` to validate each candidate's actual output.
+PDF/UA metadata records the requested standard. Compliance still needs
+independent validation of alt text, reading order, and equations.
