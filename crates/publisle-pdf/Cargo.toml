@@ -47,7 +47,7 @@ unicode-segmentation = "1.13.3"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"], optional = true }
 resvg = { version = "0.45", default-features = false, features = ["text"], optional = true }
 svg2pdf = { version = "=0.13.0", default-features = false, features = ["text", "filters"], optional = true }
-lopdf = { version = "0.46", default-features = false, optional = true }
+lopdf = { version = "0.47", default-features = false, optional = true }
 hyphenation = { version = "0.8", default-features = false, features = ["embed_en-us"] }
 
 [package.metadata.docs.rs]
